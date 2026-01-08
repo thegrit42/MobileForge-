@@ -255,7 +255,7 @@ document.addEventListener("click", function(e) {
   if (!menu.contains(e.target) && e.target.id !== "menuBtn") {
     menu.style.display = "none";
   }
-  if (!fileBrowser.contains(e.target)) {
+  if (!fileBrowser.contains(e.target) && e.target.id !== "openBtn") {
     fileBrowser.style.display = "none";
   }
 });
