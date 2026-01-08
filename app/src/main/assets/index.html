@@ -190,7 +190,8 @@ document.getElementById("saveBtn").onclick = function() {
   menu.style.display = "none";
 };
 
-document.getElementById("openBtn").onclick = function() {
+document.getElementById("openBtn").onclick = function(e) {
+  e.stopPropagation();
   alert("Open button clicked!");
   console.log("Open button clicked");
   if (typeof FileAPI !== "undefined") {
