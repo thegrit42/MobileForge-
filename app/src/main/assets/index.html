@@ -112,6 +112,7 @@ if (isDark) {
 
 // Check FileAPI availability
 console.log("FileAPI available:", typeof FileAPI !== "undefined");
+alert("Mobile Forge loaded! FileAPI: " + (typeof FileAPI !== "undefined" ? "YES" : "NO"));
 if (typeof FileAPI !== "undefined") {
   try {
     var workDir = FileAPI.getWorkDir();
@@ -119,6 +120,7 @@ if (typeof FileAPI !== "undefined") {
     document.getElementById("browserHeader").textContent = "Files in " + workDir.split("/").pop();
   } catch(e) {
     console.error("Error getting work dir:", e);
+    alert("Error getting work dir: " + e);
   }
 }
 
@@ -150,6 +152,7 @@ document.getElementById("newBtn").onclick = function() {
 };
 
 document.getElementById("saveBtn").onclick = function() {
+  alert("Save button clicked!");
   console.log("Save button clicked");
   var name = fileName.value.trim();
   if (!name) {
@@ -183,6 +186,7 @@ document.getElementById("saveBtn").onclick = function() {
 };
 
 document.getElementById("openBtn").onclick = function() {
+  alert("Open button clicked!");
   console.log("Open button clicked");
   if (typeof FileAPI !== "undefined") {
     try {
