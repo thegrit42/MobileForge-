@@ -6,9 +6,33 @@
 <script src="javascript.js"></script>
 <script src="htmlmixed.js"></script>
 <script src="css.js"></script>
-<style>html,body {margin:0;padding:0;height:100%;} #editor {height:70%;} #output {height:30%;border-top:1px solid #ccc;}</style>
+<style>
+html,body {margin:0;padding:0;height:100%;font-family:sans-serif;transition:background 0.3s,color 0.3s;}
+#toolbar {height:40px;background:#f0f0f0;border-bottom:1px solid #ccc;display:flex;align-items:center;padding:0 10px;}
+#toolbar button {padding:8px 16px;margin-right:10px;border:1px solid #999;background:#fff;cursor:pointer;border-radius:4px;}
+#toolbar button:active {background:#ddd;}
+#editor-container {height:calc(60% - 40px);}
+#output {height:40%;border-top:1px solid #ccc;background:#fff;}
+
+body.dark {background:#1e1e1e;color:#d4d4d4;}
+body.dark #toolbar {background:#252526;border-bottom:1px solid #3e3e42;}
+body.dark #toolbar button {background:#3e3e42;color:#d4d4d4;border:1px solid #555;}
+body.dark #toolbar button:active {background:#505050;}
+body.dark #output {background:#1e1e1e;border-top:1px solid #3e3e42;}
+body.dark .CodeMirror {background:#1e1e1e;color:#d4d4d4;}
+body.dark .CodeMirror-gutters {background:#252526;border-right:1px solid #3e3e42;}
+body.dark .CodeMirror-linenumber {color:#858585;}
+body.dark .CodeMirror-cursor {border-left:1px solid #d4d4d4;}
+</style>
 </head><body>
-<textarea id="editor">// Edit JS here\nconsole.log("Mobile Forge v0.1");\nalert("Ready");</textarea>
+<div id="toolbar">
+  <button id="darkToggle">🌙 Dark Mode</button>
+</div>
+<div id="editor-container">
+  <textarea id="editor">// Edit JS here
+console.log("Mobile Forge v0.1");
+alert("Ready");</textarea>
+</div>
 <iframe id="output" sandbox="allow-scripts"></iframe>
 <script>
 var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {lineNumbers: true, mode: "javascript", theme: "default"});
@@ -20,5 +44,18 @@ var run = function() {
 };
 editor.on("change", run);
 run();
+
+var darkToggle = document.getElementById("darkToggle");
+var isDark = localStorage.getItem("darkMode") === "true";
+if (isDark) {
+  document.body.classList.add("dark");
+  darkToggle.textContent = "☀️ Light Mode";
+}
+darkToggle.onclick = function() {
+  document.body.classList.toggle("dark");
+  isDark = document.body.classList.contains("dark");
+  localStorage.setItem("darkMode", isDark);
+  darkToggle.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+};
 </script>
 </body></html>
