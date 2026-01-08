@@ -16,6 +16,12 @@ html,body {margin:0;padding:0;height:100%;font-family:sans-serif;transition:back
 #editor-container {height:calc(60% - 40px);}
 #output {height:40%;border-top:1px solid #ccc;background:#fff;}
 
+#fileBrowser {display:none;position:fixed;top:50px;right:10px;width:300px;max-height:400px;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 10px rgba(0,0,0,0.2);overflow:auto;z-index:1000;}
+#fileBrowser .header {padding:10px;background:#f0f0f0;border-bottom:1px solid #ccc;font-weight:bold;}
+#fileBrowser .file {padding:8px 10px;border-bottom:1px solid #eee;cursor:pointer;}
+#fileBrowser .file:hover {background:#f0f0f0;}
+#fileBrowser .empty {padding:20px;text-align:center;color:#999;}
+
 body.dark {background:#1e1e1e;color:#d4d4d4;}
 body.dark #toolbar {background:#252526;border-bottom:1px solid #3e3e42;}
 body.dark #toolbar button {background:#3e3e42;color:#d4d4d4;border:1px solid #555;}
@@ -27,12 +33,23 @@ body.dark .CodeMirror {background:#1e1e1e;color:#d4d4d4;}
 body.dark .CodeMirror-gutters {background:#252526;border-right:1px solid #3e3e42;}
 body.dark .CodeMirror-linenumber {color:#858585;}
 body.dark .CodeMirror-cursor {border-left:1px solid #d4d4d4;}
+body.dark #fileBrowser {background:#252526;border:1px solid #3e3e42;}
+body.dark #fileBrowser .header {background:#1e1e1e;border-bottom:1px solid #3e3e42;}
+body.dark #fileBrowser .file {border-bottom:1px solid #3e3e42;}
+body.dark #fileBrowser .file:hover {background:#3e3e42;}
 </style>
 </head><body>
 <div id="toolbar">
   <button id="darkToggle">🌙</button>
+  <button id="newBtn">New</button>
+  <button id="openBtn">Open</button>
+  <button id="saveBtn">Save</button>
   <input type="text" id="fileName" value="untitled.js" />
   <span id="status">Ready</span>
+</div>
+<div id="fileBrowser">
+  <div class="header">Files in /Downloads/MobileForge</div>
+  <div id="fileList"></div>
 </div>
 <div id="editor-container">
   <textarea id="editor">// Edit JS here
@@ -45,10 +62,14 @@ var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {lineNum
 var output = document.getElementById("output");
 var status = document.getElementById("status");
 var fileName = document.getElementById("fileName");
+var fileBrowser = document.getElementById("fileBrowser");
+var fileList = document.getElementById("fileList");
+var isDirty = false;
 
 var setStatus = function(msg, color) {
   status.textContent = msg;
   if (color) status.style.color = color;
+  else status.style.color = "";
 };
 
 var run = function() {
@@ -60,6 +81,7 @@ var run = function() {
 };
 
 editor.on("change", function() {
+  isDirty = true;
   setStatus("Unsaved", "#f90");
   run();
 });
@@ -78,9 +100,75 @@ darkToggle.onclick = function() {
   darkToggle.textContent = isDark ? "☀️" : "🌙";
 };
 
-fileName.addEventListener("blur", function() {
-  setStatus("Saved", "#0a0");
-  setTimeout(function() { setStatus("Ready", ""); }, 2000);
+document.getElementById("newBtn").onclick = function() {
+  if (isDirty && !confirm("Discard unsaved changes?")) return;
+  editor.setValue("// New file\n");
+  fileName.value = "untitled.js";
+  isDirty = false;
+  setStatus("Ready");
+};
+
+document.getElementById("saveBtn").onclick = function() {
+  var name = fileName.value.trim();
+  if (!name) {
+    alert("Enter a file name");
+    return;
+  }
+  if (typeof FileAPI !== "undefined") {
+    var success = FileAPI.writeFile(name, editor.getValue());
+    if (success) {
+      setStatus("Saved", "#0a0");
+      isDirty = false;
+      setTimeout(function() { setStatus("Ready", ""); }, 2000);
+    } else {
+      setStatus("Save failed", "#f00");
+    }
+  } else {
+    setStatus("FileAPI unavailable", "#f00");
+  }
+};
+
+document.getElementById("openBtn").onclick = function() {
+  if (typeof FileAPI !== "undefined") {
+    var filesJson = FileAPI.listFiles();
+    var files = JSON.parse(filesJson);
+    if (files.length === 0) {
+      fileList.innerHTML = '<div class="empty">No files yet</div>';
+    } else {
+      fileList.innerHTML = "";
+      files.forEach(function(f) {
+        if (!f.isDir) {
+          var div = document.createElement("div");
+          div.className = "file";
+          div.textContent = f.name;
+          div.onclick = function() {
+            if (isDirty && !confirm("Discard unsaved changes?")) return;
+            var content = FileAPI.readFile(f.name);
+            if (content !== null) {
+              editor.setValue(content);
+              fileName.value = f.name;
+              isDirty = false;
+              setStatus("Loaded", "#0a0");
+              setTimeout(function() { setStatus("Ready", ""); }, 2000);
+              fileBrowser.style.display = "none";
+            } else {
+              alert("Failed to read file");
+            }
+          };
+          fileList.appendChild(div);
+        }
+      });
+    }
+    fileBrowser.style.display = "block";
+  } else {
+    alert("FileAPI unavailable");
+  }
+};
+
+document.addEventListener("click", function(e) {
+  if (!fileBrowser.contains(e.target) && e.target.id !== "openBtn") {
+    fileBrowser.style.display = "none";
+  }
 });
 </script>
 </body></html>
