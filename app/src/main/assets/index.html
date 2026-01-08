@@ -155,6 +155,7 @@ document.getElementById("saveBtn").onclick = function() {
   alert("Save button clicked!");
   console.log("Save button clicked");
   var name = fileName.value.trim();
+  alert("Filename: " + name);
   if (!name) {
     alert("Enter a file name");
     return;
@@ -163,21 +164,25 @@ document.getElementById("saveBtn").onclick = function() {
   if (typeof FileAPI !== "undefined") {
     try {
       var content = editor.getValue();
+      alert("Content length: " + content.length + " chars");
       console.log("Content length:", content.length);
+      alert("Calling FileAPI.writeFile...");
       var success = FileAPI.writeFile(name, content);
+      alert("Save result: " + success);
       console.log("Save result:", success);
       if (success) {
+        alert("SUCCESS! File saved");
         setStatus("Saved", "#0a0");
         isDirty = false;
         setTimeout(function() { setStatus("Ready"); }, 2000);
       } else {
+        alert("FAILED! writeFile returned false");
         setStatus("Failed", "#f00");
-        alert("Save failed - check logcat for details");
       }
     } catch(e) {
       console.error("Save error:", e);
       setStatus("Error: " + e, "#f00");
-      alert("Error: " + e);
+      alert("EXCEPTION: " + e);
     }
   } else {
     alert("File API not available");
@@ -190,10 +195,13 @@ document.getElementById("openBtn").onclick = function() {
   console.log("Open button clicked");
   if (typeof FileAPI !== "undefined") {
     try {
+      alert("Calling FileAPI.listFiles()...");
       console.log("Calling FileAPI.listFiles()");
       var filesJson = FileAPI.listFiles();
+      alert("Got files JSON: " + filesJson);
       console.log("Files JSON:", filesJson);
       var files = JSON.parse(filesJson);
+      alert("Found " + files.length + " files");
       console.log("Parsed files:", files.length);
       if (files.length === 0) {
         fileList.innerHTML = '<div class="empty">No files yet. Save a file first.</div>';
@@ -205,9 +213,11 @@ document.getElementById("openBtn").onclick = function() {
             div.className = "file";
             div.textContent = f.name;
             div.onclick = function() {
+              alert("Loading file: " + f.name);
               console.log("Loading file:", f.name);
               if (isDirty && !confirm("Discard unsaved changes?")) return;
               var content = FileAPI.readFile(f.name);
+              alert("Read result: " + (content !== null ? content.length + " chars" : "NULL"));
               console.log("Read content:", content !== null ? content.length + " chars" : "null");
               if (content !== null) {
                 editor.setValue(content);
@@ -224,10 +234,11 @@ document.getElementById("openBtn").onclick = function() {
           }
         });
       }
+      alert("Showing file browser");
       fileBrowser.style.display = "block";
     } catch(e) {
       console.error("Open error:", e);
-      alert("Error: " + e);
+      alert("EXCEPTION in open: " + e);
     }
   } else {
     alert("File API not available");
