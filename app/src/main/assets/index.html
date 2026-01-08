@@ -78,7 +78,7 @@ console.log("Ready");
 </div>
 <div id="fileBrowser">
   <div class="close" id="closeBrowser">✕</div>
-  <div class="header">Files in /Downloads/MobileForge</div>
+  <div class="header" id="browserHeader">Files</div>
   <div class="content">
     <div id="fileList"></div>
   </div>
@@ -110,6 +110,18 @@ if (isDark) {
   document.getElementById("darkToggleBtn").textContent = "☀️ Light Mode";
 }
 
+// Check FileAPI availability
+console.log("FileAPI available:", typeof FileAPI !== "undefined");
+if (typeof FileAPI !== "undefined") {
+  try {
+    var workDir = FileAPI.getWorkDir();
+    console.log("Work directory:", workDir);
+    document.getElementById("browserHeader").textContent = "Files in " + workDir.split("/").pop();
+  } catch(e) {
+    console.error("Error getting work dir:", e);
+  }
+}
+
 editor.on("change", function() {
   isDirty = true;
   setStatus("Unsaved", "#f90");
@@ -138,23 +150,31 @@ document.getElementById("newBtn").onclick = function() {
 };
 
 document.getElementById("saveBtn").onclick = function() {
+  console.log("Save button clicked");
   var name = fileName.value.trim();
   if (!name) {
     alert("Enter a file name");
     return;
   }
+  console.log("Saving file:", name);
   if (typeof FileAPI !== "undefined") {
     try {
-      var success = FileAPI.writeFile(name, editor.getValue());
+      var content = editor.getValue();
+      console.log("Content length:", content.length);
+      var success = FileAPI.writeFile(name, content);
+      console.log("Save result:", success);
       if (success) {
         setStatus("Saved", "#0a0");
         isDirty = false;
         setTimeout(function() { setStatus("Ready"); }, 2000);
       } else {
         setStatus("Failed", "#f00");
+        alert("Save failed - check logcat for details");
       }
     } catch(e) {
+      console.error("Save error:", e);
       setStatus("Error: " + e, "#f00");
+      alert("Error: " + e);
     }
   } else {
     alert("File API not available");
@@ -163,10 +183,14 @@ document.getElementById("saveBtn").onclick = function() {
 };
 
 document.getElementById("openBtn").onclick = function() {
+  console.log("Open button clicked");
   if (typeof FileAPI !== "undefined") {
     try {
+      console.log("Calling FileAPI.listFiles()");
       var filesJson = FileAPI.listFiles();
+      console.log("Files JSON:", filesJson);
       var files = JSON.parse(filesJson);
+      console.log("Parsed files:", files.length);
       if (files.length === 0) {
         fileList.innerHTML = '<div class="empty">No files yet. Save a file first.</div>';
       } else {
@@ -177,8 +201,10 @@ document.getElementById("openBtn").onclick = function() {
             div.className = "file";
             div.textContent = f.name;
             div.onclick = function() {
+              console.log("Loading file:", f.name);
               if (isDirty && !confirm("Discard unsaved changes?")) return;
               var content = FileAPI.readFile(f.name);
+              console.log("Read content:", content !== null ? content.length + " chars" : "null");
               if (content !== null) {
                 editor.setValue(content);
                 fileName.value = f.name;
@@ -196,6 +222,7 @@ document.getElementById("openBtn").onclick = function() {
       }
       fileBrowser.style.display = "block";
     } catch(e) {
+      console.error("Open error:", e);
       alert("Error: " + e);
     }
   } else {
