@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="codemirror.css">
+<script src="codemirror.js"></script>
+<script src="javascript.js"></script>
+<script src="htmlmixed.js"></script>
+<script src="css.js"></script>
+<style>html,body {margin:0;padding:0;height:100%;} #editor {height:70%;} #output {height:30%;border-top:1px solid #ccc;}</style>
+</head><body>
+<textarea id="editor">// Edit JS here\nconsole.log("Mobile Forge v0.1");\nalert("Ready");</textarea>
+<iframe id="output" sandbox="allow-scripts"></iframe>
+<script>
+var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {lineNumbers: true, mode: "javascript", theme: "default"});
+var output = document.getElementById("output");
+var run = function() {
+  var code = editor.getValue();
+  var html = '<html><body><script>' + code + '<\/script></body></html>';
+  output.srcdoc = html;
+};
+editor.on("change", run);
+run();
+</script>
+</body></html>
