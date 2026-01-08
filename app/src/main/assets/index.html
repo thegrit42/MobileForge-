@@ -12,12 +12,14 @@
 html,body {margin:0;padding:0;height:100%;width:100%;font-family:sans-serif;overflow:hidden;}
 body {transition:background 0.3s,color 0.3s;}
 
-#editor-container {position:absolute;top:0;left:0;right:0;bottom:40px;width:100%;}
+#topBar {position:absolute;top:0;left:0;right:0;height:40px;background:#f0f0f0;border-bottom:1px solid #ccc;display:flex;align-items:center;padding:0 10px;justify-content:space-between;}
+#currentFile {font-weight:bold;font-size:14px;flex:1;}
+#status {color:#666;font-size:12px;font-weight:bold;margin-right:10px;}
+
+#editor-container {position:absolute;top:40px;left:0;right:0;bottom:40px;width:100%;}
 .CodeMirror {height:100%!important;width:100%!important;font-size:14px;}
 
-#bottomBar {position:absolute;bottom:0;left:0;right:0;height:40px;background:#f0f0f0;border-top:1px solid #ccc;display:flex;align-items:center;padding:0 8px;gap:8px;}
-#fileName {flex:1;padding:6px;border:1px solid #999;border-radius:4px;background:#fff;font-size:13px;min-width:0;}
-#status {color:#666;font-size:12px;white-space:nowrap;}
+#bottomBar {position:absolute;bottom:0;left:0;right:0;height:40px;background:#f0f0f0;border-top:1px solid #ccc;display:flex;align-items:center;padding:0 8px;gap:8px;justify-content:flex-end;}
 #menuBtn {padding:6px 12px;border:1px solid #999;background:#fff;cursor:pointer;border-radius:4px;font-size:16px;}
 #menuBtn:active {background:#ddd;}
 
@@ -36,12 +38,16 @@ body {transition:background 0.3s,color 0.3s;}
 #fileBrowser .close {position:absolute;top:8px;right:8px;padding:4px 8px;cursor:pointer;background:#e0e0e0;border-radius:4px;}
 #fileBrowser .close:active {background:#d0d0d0;}
 
-#output {display:none;}
+#saveDialog {display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:400px;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 20px rgba(0,0,0,0.3);padding:20px;z-index:1001;}
+#saveDialog input {width:100%;padding:8px;margin:10px 0;border:1px solid #999;border-radius:4px;font-size:14px;}
+#saveDialog button {padding:8px 16px;margin:5px;border:1px solid #999;background:#fff;cursor:pointer;border-radius:4px;}
+#saveDialog button:active {background:#ddd;}
 
 body.dark {background:#1e1e1e;color:#d4d4d4;}
-body.dark #bottomBar {background:#252526;border-top:1px solid #3e3e42;}
-body.dark #fileName {background:#3e3e42;color:#d4d4d4;border:1px solid #555;}
+body.dark #topBar {background:#252526;border-bottom:1px solid #3e3e42;}
+body.dark #currentFile {color:#d4d4d4;}
 body.dark #status {color:#858585;}
+body.dark #bottomBar {background:#252526;border-top:1px solid #3e3e42;}
 body.dark #menuBtn {background:#3e3e42;color:#d4d4d4;border:1px solid #555;}
 body.dark #menuBtn:active {background:#505050;}
 body.dark #menu {background:#252526;border:1px solid #3e3e42;}
@@ -58,16 +64,22 @@ body.dark #fileBrowser .file {border-bottom:1px solid #3e3e42;}
 body.dark #fileBrowser .file:hover {background:#3e3e42;}
 body.dark #fileBrowser .close {background:#3e3e42;color:#d4d4d4;}
 body.dark #fileBrowser .close:active {background:#505050;}
+body.dark #saveDialog {background:#252526;border:1px solid #3e3e42;color:#d4d4d4;}
+body.dark #saveDialog input {background:#3e3e42;color:#d4d4d4;border:1px solid #555;}
+body.dark #saveDialog button {background:#3e3e42;color:#d4d4d4;border:1px solid #555;}
+body.dark #saveDialog button:active {background:#505050;}
 </style>
 </head><body>
+<div id="topBar">
+  <div id="currentFile">untitled.js</div>
+  <div id="status">Ready</div>
+</div>
 <div id="editor-container">
   <textarea id="editor">// Mobile Forge IDE
 console.log("Ready");
 </textarea>
 </div>
 <div id="bottomBar">
-  <input type="text" id="fileName" value="untitled.js" placeholder="filename.js" />
-  <span id="status">Ready</span>
   <button id="menuBtn">⋮</button>
 </div>
 <div id="menu">
@@ -75,6 +87,7 @@ console.log("Ready");
   <button id="newBtn">New File</button>
   <button id="openBtn">Open File</button>
   <button id="saveBtn">Save File</button>
+  <button id="saveAsBtn">Save As</button>
 </div>
 <div id="fileBrowser">
   <div class="close" id="closeBrowser">✕</div>
@@ -83,7 +96,14 @@ console.log("Ready");
     <div id="fileList"></div>
   </div>
 </div>
-<iframe id="output" sandbox="allow-scripts"></iframe>
+<div id="saveDialog">
+  <div style="font-weight:bold;margin-bottom:10px;">Save File As</div>
+  <input type="text" id="saveAsInput" placeholder="filename.js" />
+  <div>
+    <button id="saveAsConfirm">Save</button>
+    <button id="saveAsCancel">Cancel</button>
+  </div>
+</div>
 <script>
 var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
   lineNumbers: true,
@@ -91,17 +111,24 @@ var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
   theme: "default",
   lineWrapping: true
 });
-var output = document.getElementById("output");
+var currentFile = document.getElementById("currentFile");
 var status = document.getElementById("status");
-var fileName = document.getElementById("fileName");
 var menu = document.getElementById("menu");
 var fileBrowser = document.getElementById("fileBrowser");
 var fileList = document.getElementById("fileList");
+var saveDialog = document.getElementById("saveDialog");
+var saveAsInput = document.getElementById("saveAsInput");
 var isDirty = false;
+var currentFileName = "untitled.js";
 
 var setStatus = function(msg, color) {
   status.textContent = msg;
-  status.style.color = color || "";
+  status.style.color = color || "#666";
+};
+
+var setCurrentFile = function(name) {
+  currentFileName = name;
+  currentFile.textContent = name + (isDirty ? " *" : "");
 };
 
 var isDark = localStorage.getItem("darkMode") === "true";
@@ -110,23 +137,18 @@ if (isDark) {
   document.getElementById("darkToggleBtn").textContent = "☀️ Light Mode";
 }
 
-// Check FileAPI availability
-console.log("FileAPI available:", typeof FileAPI !== "undefined");
-alert("Mobile Forge loaded! FileAPI: " + (typeof FileAPI !== "undefined" ? "YES" : "NO"));
 if (typeof FileAPI !== "undefined") {
   try {
     var workDir = FileAPI.getWorkDir();
-    console.log("Work directory:", workDir);
     document.getElementById("browserHeader").textContent = "Files in " + workDir.split("/").pop();
   } catch(e) {
     console.error("Error getting work dir:", e);
-    alert("Error getting work dir: " + e);
   }
 }
 
 editor.on("change", function() {
   isDirty = true;
-  setStatus("Unsaved", "#f90");
+  currentFile.textContent = currentFileName + " *";
 });
 
 document.getElementById("menuBtn").onclick = function(e) {
@@ -145,65 +167,71 @@ document.getElementById("darkToggleBtn").onclick = function() {
 document.getElementById("newBtn").onclick = function() {
   if (isDirty && !confirm("Discard unsaved changes?")) return;
   editor.setValue("// New file\n");
-  fileName.value = "untitled.js";
+  setCurrentFile("untitled.js");
   isDirty = false;
   setStatus("Ready");
   menu.style.display = "none";
 };
 
 document.getElementById("saveBtn").onclick = function() {
-  alert("Save button clicked!");
-  console.log("Save button clicked");
-  var name = fileName.value.trim();
-  alert("Filename: " + name);
-  if (!name) {
-    alert("Enter a file name");
-    return;
-  }
-  console.log("Saving file:", name);
-  if (typeof FileAPI !== "undefined") {
-    try {
-      var content = editor.getValue();
-      alert("Content length: " + content.length + " chars");
-      console.log("Content length:", content.length);
-      alert("Calling FileAPI.writeFile...");
-      var success = FileAPI.writeFile(name, content);
-      alert("Save result: " + success);
-      console.log("Save result:", success);
-      if (success) {
-        alert("SUCCESS! File saved");
-        setStatus("Saved", "#0a0");
-        isDirty = false;
-        setTimeout(function() { setStatus("Ready"); }, 2000);
-      } else {
-        alert("FAILED! writeFile returned false");
-        setStatus("Failed", "#f00");
-      }
-    } catch(e) {
-      console.error("Save error:", e);
-      setStatus("Error: " + e, "#f00");
-      alert("EXCEPTION: " + e);
-    }
+  if (currentFileName === "untitled.js") {
+    saveAsInput.value = "untitled.js";
+    saveDialog.style.display = "block";
   } else {
-    alert("File API not available");
+    saveFile(currentFileName);
   }
   menu.style.display = "none";
 };
 
-document.getElementById("openBtn").onclick = function(e) {
-  e.stopPropagation();
-  alert("Open button clicked!");
-  console.log("Open button clicked");
+document.getElementById("saveAsBtn").onclick = function() {
+  saveAsInput.value = currentFileName;
+  saveDialog.style.display = "block";
+  menu.style.display = "none";
+};
+
+document.getElementById("saveAsConfirm").onclick = function() {
+  var name = saveAsInput.value.trim();
+  if (!name) {
+    alert("Enter a file name");
+    return;
+  }
+  saveFile(name);
+  saveDialog.style.display = "none";
+};
+
+document.getElementById("saveAsCancel").onclick = function() {
+  saveDialog.style.display = "none";
+};
+
+function saveFile(name) {
   if (typeof FileAPI !== "undefined") {
     try {
-      alert("Calling FileAPI.listFiles()...");
-      console.log("Calling FileAPI.listFiles()");
+      setStatus("Saving...", "#f90");
+      var success = FileAPI.writeFile(name, editor.getValue());
+      if (success) {
+        setCurrentFile(name);
+        isDirty = false;
+        setStatus("Saved", "#0a0");
+        setTimeout(function() { setStatus("Ready"); }, 2000);
+      } else {
+        setStatus("Save failed", "#f00");
+      }
+    } catch(e) {
+      setStatus("Error", "#f00");
+      alert("Error: " + e);
+    }
+  } else {
+    alert("File API not available");
+  }
+}
+
+document.getElementById("openBtn").onclick = function(e) {
+  e.stopPropagation();
+  if (typeof FileAPI !== "undefined") {
+    try {
+      setStatus("Loading...", "#f90");
       var filesJson = FileAPI.listFiles();
-      alert("Got files JSON: " + filesJson);
-      console.log("Files JSON:", filesJson);
       var files = JSON.parse(filesJson);
-      alert("Found " + files.length + " files");
-      console.log("Parsed files:", files.length);
       if (files.length === 0) {
         fileList.innerHTML = '<div class="empty">No files yet. Save a file first.</div>';
       } else {
@@ -214,20 +242,18 @@ document.getElementById("openBtn").onclick = function(e) {
             div.className = "file";
             div.textContent = f.name;
             div.onclick = function() {
-              alert("Loading file: " + f.name);
-              console.log("Loading file:", f.name);
               if (isDirty && !confirm("Discard unsaved changes?")) return;
+              setStatus("Loading...", "#f90");
               var content = FileAPI.readFile(f.name);
-              alert("Read result: " + (content !== null ? content.length + " chars" : "NULL"));
-              console.log("Read content:", content !== null ? content.length + " chars" : "null");
               if (content !== null) {
                 editor.setValue(content);
-                fileName.value = f.name;
+                setCurrentFile(f.name);
                 isDirty = false;
                 setStatus("Loaded", "#0a0");
                 setTimeout(function() { setStatus("Ready"); }, 2000);
                 fileBrowser.style.display = "none";
               } else {
+                setStatus("Load failed", "#f00");
                 alert("Failed to read file");
               }
             };
@@ -235,11 +261,11 @@ document.getElementById("openBtn").onclick = function(e) {
           }
         });
       }
-      alert("Showing file browser");
       fileBrowser.style.display = "block";
+      setStatus("Ready");
     } catch(e) {
-      console.error("Open error:", e);
-      alert("EXCEPTION in open: " + e);
+      setStatus("Error", "#f00");
+      alert("Error: " + e);
     }
   } else {
     alert("File API not available");
@@ -257,6 +283,9 @@ document.addEventListener("click", function(e) {
   }
   if (!fileBrowser.contains(e.target) && e.target.id !== "openBtn") {
     fileBrowser.style.display = "none";
+  }
+  if (!saveDialog.contains(e.target)) {
+    saveDialog.style.display = "none";
   }
 });
 </script>
