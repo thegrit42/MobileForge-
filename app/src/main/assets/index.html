@@ -116,6 +116,7 @@ console.log("Ready");
   <button id="openBtn">Open File</button>
   <button id="saveBtn">Save File</button>
   <button id="saveAsBtn">Save As</button>
+  <button id="buildBtn">Build APK</button>
 </div>
 <div id="fileBrowser">
   <div class="close" id="closeBrowser">✕</div>
@@ -374,6 +375,32 @@ document.getElementById("openBtn").onclick = function(e) {
     }
   } else {
     alert("File API not available");
+  }
+  menu.style.display = "none";
+};
+
+document.getElementById("buildBtn").onclick = function(e) {
+  e.stopPropagation();
+  console.log("=== BUILD CLICKED ===");
+  if (typeof BuildAPI !== "undefined") {
+    try {
+      setStatus("Building...", "#f90");
+      console.log("Starting build process...");
+      var result = BuildAPI.buildAPK();
+      console.log("Build result:", result);
+      if (result && result.indexOf("SUCCESS") !== -1) {
+        setStatus("Build complete", "#0a0");
+        setTimeout(function() { setStatus("Ready"); }, 3000);
+      } else {
+        setStatus("Build failed", "#f00");
+      }
+    } catch(e) {
+      console.error("Build error:", e);
+      setStatus("Build error", "#f00");
+      alert("Build error: " + e);
+    }
+  } else {
+    alert("Build API not available");
   }
   menu.style.display = "none";
 };
