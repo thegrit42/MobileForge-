@@ -151,18 +151,7 @@ var consoleContent = document.getElementById("consoleContent");
 var isDirty = false;
 var currentFileName = "untitled.js";
 
-// Debug: Check if elements were found
-if (!currentFile) console.error("currentFile element not found!");
-if (!status) console.error("status element not found!");
-if (!menu) console.error("menu element not found!");
-if (!fileBrowser) console.error("fileBrowser element not found!");
-if (!fileList) console.error("fileList element not found!");
-if (!saveDialog) console.error("saveDialog element not found!");
-if (!saveAsInput) console.error("saveAsInput element not found!");
-if (!consolePanel) console.error("consolePanel element not found!");
-if (!consoleContent) console.error("consoleContent element not found!");
-
-// Console intercept
+// Console intercept - SET THIS UP FIRST
 var addLog = function(msg, type) {
   var div = document.createElement("div");
   div.className = type || "log";
@@ -202,21 +191,25 @@ window.onerror = function(msg, url, line, col, error) {
 };
 
 var setStatus = function(msg, color) {
-  if (!status) {
-    console.error("status element not found!");
-    return;
+  try {
+    if (status && status.style) {
+      status.textContent = msg;
+      status.style.color = color || "#666";
+    }
+  } catch(e) {
+    console.error("setStatus error:", e);
   }
-  status.textContent = msg;
-  status.style.color = color || "#666";
 };
 
 var setCurrentFile = function(name) {
   currentFileName = name;
-  if (!currentFile) {
-    console.error("currentFile element not found!");
-    return;
+  try {
+    if (currentFile) {
+      currentFile.textContent = name + (isDirty ? " *" : "");
+    }
+  } catch(e) {
+    console.error("setCurrentFile error:", e);
   }
-  currentFile.textContent = name + (isDirty ? " *" : "");
 };
 
 var isDark = localStorage.getItem("darkMode") === "true";
@@ -271,20 +264,16 @@ document.getElementById("newBtn").onclick = function() {
 };
 
 document.getElementById("saveBtn").onclick = function() {
-  console.log("Save clicked! Current file:", currentFileName);
   if (currentFileName === "untitled.js") {
-    console.log("Showing save as dialog");
     saveAsInput.value = "untitled.js";
     saveDialog.style.display = "block";
   } else {
-    console.log("Saving file:", currentFileName);
     saveFile(currentFileName);
   }
   menu.style.display = "none";
 };
 
 document.getElementById("saveAsBtn").onclick = function() {
-  console.log("Save As clicked!");
   saveAsInput.value = currentFileName;
   saveDialog.style.display = "block";
   menu.style.display = "none";
@@ -328,10 +317,8 @@ function saveFile(name) {
 
 document.getElementById("openBtn").onclick = function(e) {
   e.stopPropagation();
-  console.log("Open clicked!");
   if (typeof FileAPI !== "undefined") {
     try {
-      console.log("Calling listFiles...");
       setStatus("Loading...", "#f90");
       var filesJson = FileAPI.listFiles();
       var files = JSON.parse(filesJson);
