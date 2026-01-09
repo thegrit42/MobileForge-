@@ -274,18 +274,26 @@ document.getElementById("saveBtn").onclick = function() {
 };
 
 document.getElementById("saveAsBtn").onclick = function() {
+  console.log("=== SAVE AS CLICKED ===");
+  console.log("Current filename:", currentFileName);
   saveAsInput.value = currentFileName;
   saveDialog.style.display = "block";
+  console.log("Dialog displayed");
   menu.style.display = "none";
 };
 
 document.getElementById("saveAsConfirm").onclick = function() {
+  console.log("=== SAVE CONFIRM CLICKED ===");
   var name = saveAsInput.value.trim();
+  console.log("Filename from input:", name);
   if (!name) {
+    console.log("No filename - showing alert");
     alert("Enter a file name");
     return;
   }
+  console.log("Calling saveFile with:", name);
   saveFile(name);
+  console.log("Hiding dialog");
   saveDialog.style.display = "none";
 };
 
@@ -294,23 +302,36 @@ document.getElementById("saveAsCancel").onclick = function() {
 };
 
 function saveFile(name) {
+  console.log("=== SAVEFILE FUNCTION ===");
+  console.log("Name:", name);
+  console.log("FileAPI available:", typeof FileAPI !== "undefined");
   if (typeof FileAPI !== "undefined") {
     try {
+      console.log("Setting status to Saving...");
       setStatus("Saving...", "#f90");
-      var success = FileAPI.writeFile(name, editor.getValue());
+      var content = editor.getValue();
+      console.log("Content length:", content.length);
+      console.log("Calling FileAPI.writeFile...");
+      var success = FileAPI.writeFile(name, content);
+      console.log("FileAPI.writeFile returned:", success);
       if (success) {
+        console.log("Success! Updating UI");
         setCurrentFile(name);
         isDirty = false;
         setStatus("Saved", "#0a0");
         setTimeout(function() { setStatus("Ready"); }, 2000);
+        console.log("File saved successfully");
       } else {
+        console.log("FAILED - writeFile returned false");
         setStatus("Save failed", "#f00");
       }
     } catch(e) {
+      console.error("EXCEPTION in saveFile:", e);
       setStatus("Error", "#f00");
       alert("Error: " + e);
     }
   } else {
+    console.error("FileAPI not available!");
     alert("File API not available");
   }
 }
