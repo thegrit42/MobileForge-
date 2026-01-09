@@ -151,7 +151,7 @@ var consoleContent = document.getElementById("consoleContent");
 var isDirty = false;
 var currentFileName = "untitled.js";
 
-// Console intercept - SET THIS UP FIRST
+// Console intercept
 var addLog = function(msg, type) {
   var div = document.createElement("div");
   div.className = type || "log";
@@ -263,66 +263,57 @@ document.getElementById("newBtn").onclick = function() {
   menu.style.display = "none";
 };
 
-document.getElementById("saveBtn").onclick = function() {
+document.getElementById("saveBtn").onclick = function(e) {
+  e.stopPropagation();
+  console.log("=== SAVE CLICKED ===");
   if (currentFileName === "untitled.js") {
     saveAsInput.value = "untitled.js";
     saveDialog.style.display = "block";
+    console.log("Showing save dialog");
   } else {
+    console.log("Saving to:", currentFileName);
     saveFile(currentFileName);
   }
   menu.style.display = "none";
 };
 
-document.getElementById("saveAsBtn").onclick = function() {
+document.getElementById("saveAsBtn").onclick = function(e) {
+  e.stopPropagation(); // FIXED
   console.log("=== SAVE AS CLICKED ===");
-  console.log("Current filename:", currentFileName);
   saveAsInput.value = currentFileName;
   saveDialog.style.display = "block";
-  console.log("Dialog displayed");
   menu.style.display = "none";
 };
 
-document.getElementById("saveAsConfirm").onclick = function() {
+document.getElementById("saveAsConfirm").onclick = function(e) {
+  e.stopPropagation();
   console.log("=== SAVE CONFIRM CLICKED ===");
   var name = saveAsInput.value.trim();
-  console.log("Filename from input:", name);
   if (!name) {
-    console.log("No filename - showing alert");
     alert("Enter a file name");
     return;
   }
-  console.log("Calling saveFile with:", name);
   saveFile(name);
-  console.log("Hiding dialog");
   saveDialog.style.display = "none";
 };
 
-document.getElementById("saveAsCancel").onclick = function() {
+document.getElementById("saveAsCancel").onclick = function(e) {
+  e.stopPropagation();
   saveDialog.style.display = "none";
 };
 
 function saveFile(name) {
-  console.log("=== SAVEFILE FUNCTION ===");
-  console.log("Name:", name);
-  console.log("FileAPI available:", typeof FileAPI !== "undefined");
   if (typeof FileAPI !== "undefined") {
     try {
-      console.log("Setting status to Saving...");
       setStatus("Saving...", "#f90");
       var content = editor.getValue();
-      console.log("Content length:", content.length);
-      console.log("Calling FileAPI.writeFile...");
       var success = FileAPI.writeFile(name, content);
-      console.log("FileAPI.writeFile returned:", success);
       if (success) {
-        console.log("Success! Updating UI");
         setCurrentFile(name);
         isDirty = false;
         setStatus("Saved", "#0a0");
         setTimeout(function() { setStatus("Ready"); }, 2000);
-        console.log("File saved successfully");
       } else {
-        console.log("FAILED - writeFile returned false");
         setStatus("Save failed", "#f00");
       }
     } catch(e) {
@@ -331,18 +322,20 @@ function saveFile(name) {
       alert("Error: " + e);
     }
   } else {
-    console.error("FileAPI not available!");
     alert("File API not available");
   }
 }
 
 document.getElementById("openBtn").onclick = function(e) {
   e.stopPropagation();
+  console.log("=== OPEN CLICKED ===");
   if (typeof FileAPI !== "undefined") {
     try {
       setStatus("Loading...", "#f90");
       var filesJson = FileAPI.listFiles();
+      console.log("Files JSON:", filesJson);
       var files = JSON.parse(filesJson);
+      console.log("Parsed files:", files);
       if (files.length === 0) {
         fileList.innerHTML = '<div class="empty">No files yet. Save a file first.</div>';
       } else {
@@ -352,20 +345,20 @@ document.getElementById("openBtn").onclick = function(e) {
             var div = document.createElement("div");
             div.className = "file";
             div.textContent = f.name;
-            div.onclick = function() {
+            div.onclick = function(e) {
+              e.stopPropagation();
+              console.log("Opening file:", f.name);
               if (isDirty && !confirm("Discard unsaved changes?")) return;
-              setStatus("Loading...", "#f90");
               var content = FileAPI.readFile(f.name);
               if (content !== null) {
                 editor.setValue(content);
                 setCurrentFile(f.name);
                 isDirty = false;
-                setStatus("Loaded", "#0a0");
-                setTimeout(function() { setStatus("Ready"); }, 2000);
+                setStatus("Ready");
                 fileBrowser.style.display = "none";
+                console.log("File loaded successfully");
               } else {
-                setStatus("Load failed", "#f00");
-                alert("Failed to read file");
+                console.error("Failed to read file:", f.name);
               }
             };
             fileList.appendChild(div);
@@ -373,9 +366,10 @@ document.getElementById("openBtn").onclick = function(e) {
         });
       }
       fileBrowser.style.display = "block";
+      console.log("File browser shown");
       setStatus("Ready");
     } catch(e) {
-      setStatus("Error", "#f00");
+      console.error("Open file error:", e);
       alert("Error: " + e);
     }
   } else {
@@ -384,7 +378,8 @@ document.getElementById("openBtn").onclick = function(e) {
   menu.style.display = "none";
 };
 
-document.getElementById("closeBrowser").onclick = function() {
+document.getElementById("closeBrowser").onclick = function(e) {
+  e.stopPropagation();
   fileBrowser.style.display = "none";
 };
 
@@ -395,14 +390,15 @@ document.addEventListener("click", function(e) {
   if (!fileBrowser.contains(e.target) && e.target.id !== "openBtn") {
     fileBrowser.style.display = "none";
   }
-  if (!saveDialog.contains(e.target)) {
+  // Don't close saveDialog if clicking inside it or on its buttons
+  if (!saveDialog.contains(e.target) &&
+      e.target.id !== "saveAsConfirm" &&
+      e.target.id !== "saveAsCancel") {
     saveDialog.style.display = "none";
   }
   if (!consolePanel.contains(e.target) && e.target.id !== "consoleBtn") {
     consolePanel.classList.remove("show");
   }
 });
-
-console.log("Mobile Forge initialized");
 </script>
 </body></html>
