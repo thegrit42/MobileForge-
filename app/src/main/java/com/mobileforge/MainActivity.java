@@ -144,12 +144,17 @@ public class MainActivity extends Activity {
     public class BuildAPI {
         private File ecjJar;
         private File buildDir;
+        private File mfnlGenDir;
 
         public BuildAPI() {
             ecjJar = new File(getFilesDir(), "ecj.jar");
             buildDir = new File(getExternalFilesDir(null), "build");
+            mfnlGenDir = new File(buildDir, "mfnl_generated");
             if (!buildDir.exists()) {
                 buildDir.mkdirs();
+            }
+            if (!mfnlGenDir.exists()) {
+                mfnlGenDir.mkdirs();
             }
             extractEcjIfNeeded();
         }
@@ -180,27 +185,61 @@ public class MainActivity extends Activity {
         public String buildAPK() {
             Log.d(TAG, "buildAPK() called");
             try {
-                // Step 1: Find all .java files in workDir
-                List<File> javaFiles = new ArrayList<>();
-                findJavaFiles(workDir, javaFiles);
+                StringBuilder resultLog = new StringBuilder();
 
-                if (javaFiles.isEmpty()) {
-                    return "ERROR: No .java files found in " + workDir.getAbsolutePath();
+                // Step 1: Find all .mfnl files
+                List<File> mfnlFiles = new ArrayList<>();
+                findMFNLFiles(workDir, mfnlFiles);
+
+                // Step 2: Compile MFNL to Java if MFNL files exist
+                if (!mfnlFiles.isEmpty()) {
+                    Log.d(TAG, "Found " + mfnlFiles.size() + " MFNL files");
+                    resultLog.append("=== MFNL Compilation ===\n");
+                    resultLog.append("Found " + mfnlFiles.size() + " MFNL file(s)\n\n");
+
+                    for (File mfnlFile : mfnlFiles) {
+                        Log.d(TAG, "Compiling MFNL: " + mfnlFile.getName());
+                        resultLog.append("Compiling " + mfnlFile.getName() + "...\n");
+
+                        com.mobileforge.compiler.MFNLCompiler.CompileResult mfnlResult =
+                            com.mobileforge.compiler.MFNLCompiler.compile(mfnlFile, mfnlGenDir);
+
+                        resultLog.append(mfnlResult.message).append("\n");
+
+                        if (!mfnlResult.success) {
+                            return resultLog.toString();
+                        }
+                    }
+
+                    resultLog.append("\n");
                 }
 
-                Log.d(TAG, "Found " + javaFiles.size() + " Java files");
+                // Step 3: Find all .java files (including generated ones)
+                List<File> javaFiles = new ArrayList<>();
+                findJavaFiles(workDir, javaFiles);
+                findJavaFiles(mfnlGenDir, javaFiles);
 
-                // Step 2: Prepare output directory
+                if (javaFiles.isEmpty()) {
+                    return resultLog.toString() + "ERROR: No .java files found. " +
+                           "Please create a .mfnl or .java file first.";
+                }
+
+                Log.d(TAG, "Found " + javaFiles.size() + " Java files total");
+                resultLog.append("=== Java Compilation ===\n");
+                resultLog.append("Found " + javaFiles.size() + " Java file(s)\n\n");
+
+                // Step 4: Prepare output directory
                 File classesDir = new File(buildDir, "classes");
                 if (classesDir.exists()) {
                     deleteRecursive(classesDir);
                 }
                 classesDir.mkdirs();
 
-                // Step 3: Compile using ecj
-                String result = compileJavaFiles(javaFiles, classesDir);
+                // Step 5: Compile using ecj
+                String ecjResult = compileJavaFiles(javaFiles, classesDir);
+                resultLog.append(ecjResult);
 
-                return result;
+                return resultLog.toString();
             } catch (Exception e) {
                 Log.e(TAG, "buildAPK error", e);
                 StringWriter sw = new StringWriter();
@@ -217,6 +256,18 @@ public class MainActivity extends Activity {
                     findJavaFiles(f, javaFiles);
                 } else if (f.getName().endsWith(".java")) {
                     javaFiles.add(f);
+                }
+            }
+        }
+
+        private void findMFNLFiles(File dir, List<File> mfnlFiles) {
+            File[] files = dir.listFiles();
+            if (files == null) return;
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    findMFNLFiles(f, mfnlFiles);
+                } else if (f.getName().endsWith(".mfnl")) {
+                    mfnlFiles.add(f);
                 }
             }
         }

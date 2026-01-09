@@ -91,12 +91,16 @@ body.dark #saveDialog button:active {background:#505050;}
 </style>
 </head><body>
 <div id="topBar">
-  <div id="currentFile">untitled.js</div>
+  <div id="currentFile">untitled.mfnl</div>
   <div id="status">Ready</div>
 </div>
 <div id="editor-container">
-  <textarea id="editor">// Mobile Forge IDE
-console.log("Ready");
+  <textarea id="editor">// Mobile Forge Natural Language
+// Your first app
+
+build app "Hello World"
+    place text "Welcome to Mobile Forge!"
+end app
 </textarea>
 </div>
 <div id="bottomBar">
@@ -150,7 +154,7 @@ var saveAsInput = document.getElementById("saveAsInput");
 var consolePanel = document.getElementById("console");
 var consoleContent = document.getElementById("consoleContent");
 var isDirty = false;
-var currentFileName = "untitled.js";
+var currentFileName = "untitled.mfnl";
 
 // Console intercept
 var addLog = function(msg, type) {
@@ -257,8 +261,8 @@ document.getElementById("darkToggleBtn").onclick = function() {
 
 document.getElementById("newBtn").onclick = function() {
   if (isDirty && !confirm("Discard unsaved changes?")) return;
-  editor.setValue("// New file\n");
-  setCurrentFile("untitled.js");
+  editor.setValue("// New MFNL file\nbuild app \"My App\"\n    place text \"Hello!\"\nend app\n");
+  setCurrentFile("untitled.mfnl");
   isDirty = false;
   setStatus("Ready");
   menu.style.display = "none";
@@ -267,8 +271,8 @@ document.getElementById("newBtn").onclick = function() {
 document.getElementById("saveBtn").onclick = function(e) {
   e.stopPropagation();
   console.log("=== SAVE CLICKED ===");
-  if (currentFileName === "untitled.js") {
-    saveAsInput.value = "untitled.js";
+  if (currentFileName === "untitled.mfnl") {
+    saveAsInput.value = "myapp";
     saveDialog.style.display = "block";
     console.log("Showing save dialog");
   } else {
@@ -306,9 +310,9 @@ document.getElementById("saveAsCancel").onclick = function(e) {
 function saveFile(name) {
   if (typeof FileAPI !== "undefined") {
     try {
-      // Auto-append .java if not present
-      if (!name.endsWith(".java")) {
-        name = name + ".java";
+      // Auto-append .mfnl if no extension present (MFNL is the default language)
+      if (!name.endsWith(".mfnl") && !name.endsWith(".java") && !name.endsWith(".js")) {
+        name = name + ".mfnl";
       }
       setStatus("Saving...", "#f90");
       var content = editor.getValue();
