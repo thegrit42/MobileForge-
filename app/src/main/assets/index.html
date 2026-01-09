@@ -315,16 +315,26 @@ function saveFile(name) {
         name = name + ".mfnl";
       }
       setStatus("Saving...", "#f90");
-      var content = editor.getValue();
-      var success = FileAPI.writeFile(name, content);
-      if (success) {
-        setCurrentFile(name);
-        isDirty = false;
-        setStatus("Saved", "#0a0");
-        setTimeout(function() { setStatus("Ready"); }, 2000);
-      } else {
-        setStatus("Save failed", "#f00");
-      }
+
+      // Give UI time to update before blocking call
+      setTimeout(function() {
+        try {
+          var content = editor.getValue();
+          var success = FileAPI.writeFile(name, content);
+          if (success) {
+            setCurrentFile(name);
+            isDirty = false;
+            setStatus("Saved", "#0a0");
+            setTimeout(function() { setStatus("Ready"); }, 2000);
+          } else {
+            setStatus("Save failed", "#f00");
+          }
+        } catch(e) {
+          console.error("EXCEPTION in saveFile:", e);
+          setStatus("Error", "#f00");
+          alert("Error: " + e);
+        }
+      }, 50);
     } catch(e) {
       console.error("EXCEPTION in saveFile:", e);
       setStatus("Error", "#f00");
@@ -339,78 +349,93 @@ document.getElementById("openBtn").onclick = function(e) {
   e.stopPropagation();
   console.log("=== OPEN CLICKED ===");
   if (typeof FileAPI !== "undefined") {
-    try {
-      setStatus("Loading...", "#f90");
-      var filesJson = FileAPI.listFiles();
-      console.log("Files JSON:", filesJson);
-      var files = JSON.parse(filesJson);
-      console.log("Parsed files:", files);
-      if (files.length === 0) {
-        fileList.innerHTML = '<div class="empty">No files yet. Save a file first.</div>';
-      } else {
-        fileList.innerHTML = "";
-        files.forEach(function(f) {
-          if (!f.isDir) {
-            var div = document.createElement("div");
-            div.className = "file";
-            div.textContent = f.name;
-            div.onclick = function(e) {
-              e.stopPropagation();
-              console.log("Opening file:", f.name);
-              if (isDirty && !confirm("Discard unsaved changes?")) return;
-              var content = FileAPI.readFile(f.name);
-              if (content !== null) {
-                editor.setValue(content);
-                setCurrentFile(f.name);
-                isDirty = false;
-                setStatus("Ready");
-                fileBrowser.style.display = "none";
-                console.log("File loaded successfully");
-              } else {
-                console.error("Failed to read file:", f.name);
-              }
-            };
-            fileList.appendChild(div);
-          }
-        });
+    setStatus("Loading...", "#f90");
+    menu.style.display = "none";
+
+    // Give UI time to update before blocking call
+    setTimeout(function() {
+      try {
+        var filesJson = FileAPI.listFiles();
+        console.log("Files JSON:", filesJson);
+        var files = JSON.parse(filesJson);
+        console.log("Parsed files:", files);
+        if (files.length === 0) {
+          fileList.innerHTML = '<div class="empty">No files yet. Save a file first.</div>';
+        } else {
+          fileList.innerHTML = "";
+          files.forEach(function(f) {
+            if (!f.isDir) {
+              var div = document.createElement("div");
+              div.className = "file";
+              div.textContent = f.name;
+              div.onclick = function(e) {
+                e.stopPropagation();
+                console.log("Opening file:", f.name);
+                if (isDirty && !confirm("Discard unsaved changes?")) return;
+                setStatus("Loading...", "#f90");
+                setTimeout(function() {
+                  var content = FileAPI.readFile(f.name);
+                  if (content !== null) {
+                    editor.setValue(content);
+                    setCurrentFile(f.name);
+                    isDirty = false;
+                    setStatus("Ready");
+                    fileBrowser.style.display = "none";
+                    console.log("File loaded successfully");
+                  } else {
+                    setStatus("Load failed", "#f00");
+                    console.error("Failed to read file:", f.name);
+                  }
+                }, 50);
+              };
+              fileList.appendChild(div);
+            }
+          });
+        }
+        fileBrowser.style.display = "block";
+        console.log("File browser shown");
+        setStatus("Ready");
+      } catch(e) {
+        console.error("Open file error:", e);
+        setStatus("Error", "#f00");
+        alert("Error: " + e);
       }
-      fileBrowser.style.display = "block";
-      console.log("File browser shown");
-      setStatus("Ready");
-    } catch(e) {
-      console.error("Open file error:", e);
-      alert("Error: " + e);
-    }
+    }, 50);
   } else {
     alert("File API not available");
+    menu.style.display = "none";
   }
-  menu.style.display = "none";
 };
 
 document.getElementById("buildBtn").onclick = function(e) {
   e.stopPropagation();
   console.log("=== BUILD CLICKED ===");
   if (typeof BuildAPI !== "undefined") {
-    try {
-      setStatus("Building...", "#f90");
-      console.log("Starting build process...");
-      var result = BuildAPI.buildAPK();
-      console.log("Build result:", result);
-      if (result && result.indexOf("SUCCESS") !== -1) {
-        setStatus("Build complete", "#0a0");
-        setTimeout(function() { setStatus("Ready"); }, 3000);
-      } else {
-        setStatus("Build failed", "#f00");
+    setStatus("Building...", "#f90");
+    menu.style.display = "none";
+
+    // Give UI time to update before blocking call
+    setTimeout(function() {
+      try {
+        console.log("Starting build process...");
+        var result = BuildAPI.buildAPK();
+        console.log("Build result:", result);
+        if (result && result.indexOf("SUCCESS") !== -1) {
+          setStatus("Build complete", "#0a0");
+          setTimeout(function() { setStatus("Ready"); }, 3000);
+        } else {
+          setStatus("Build failed", "#f00");
+        }
+      } catch(e) {
+        console.error("Build error:", e);
+        setStatus("Build error", "#f00");
+        alert("Build error: " + e);
       }
-    } catch(e) {
-      console.error("Build error:", e);
-      setStatus("Build error", "#f00");
-      alert("Build error: " + e);
-    }
+    }, 100);
   } else {
     alert("Build API not available");
+    menu.style.display = "none";
   }
-  menu.style.display = "none";
 };
 
 document.getElementById("closeBrowser").onclick = function(e) {
