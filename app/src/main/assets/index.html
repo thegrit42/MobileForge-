@@ -174,16 +174,20 @@ document.getElementById("newBtn").onclick = function() {
 };
 
 document.getElementById("saveBtn").onclick = function() {
+  alert("Save clicked! Current file: " + currentFileName);
   if (currentFileName === "untitled.js") {
+    alert("Showing save as dialog");
     saveAsInput.value = "untitled.js";
     saveDialog.style.display = "block";
   } else {
+    alert("Saving file: " + currentFileName);
     saveFile(currentFileName);
   }
   menu.style.display = "none";
 };
 
 document.getElementById("saveAsBtn").onclick = function() {
+  alert("Save As clicked!");
   saveAsInput.value = currentFileName;
   saveDialog.style.display = "block";
   menu.style.display = "none";
@@ -227,8 +231,10 @@ function saveFile(name) {
 
 document.getElementById("openBtn").onclick = function(e) {
   e.stopPropagation();
+  alert("Open clicked!");
   if (typeof FileAPI !== "undefined") {
     try {
+      alert("Calling listFiles...");
       setStatus("Loading...", "#f90");
       var filesJson = FileAPI.listFiles();
       var files = JSON.parse(filesJson);
