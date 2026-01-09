@@ -142,12 +142,12 @@ public class MainActivity extends Activity {
     }
 
     public class BuildAPI {
-        private File ecjJar;
+        private File ecjDexJar;
         private File buildDir;
         private File mfnlGenDir;
 
         public BuildAPI() {
-            ecjJar = new File(getFilesDir(), "ecj.jar");
+            ecjDexJar = new File(getFilesDir(), "ecj_dex.jar");
             buildDir = new File(getExternalFilesDir(null), "build");
             mfnlGenDir = new File(buildDir, "mfnl_generated");
             if (!buildDir.exists()) {
@@ -160,14 +160,14 @@ public class MainActivity extends Activity {
         }
 
         private void extractEcjIfNeeded() {
-            if (ecjJar.exists()) {
-                Log.d(TAG, "ecj.jar already extracted");
+            if (ecjDexJar.exists()) {
+                Log.d(TAG, "ecj_dex.jar already extracted");
                 return;
             }
             try {
-                Log.d(TAG, "Extracting ecj.jar from assets...");
-                InputStream is = getAssets().open("ecj.jar");
-                FileOutputStream fos = new FileOutputStream(ecjJar);
+                Log.d(TAG, "Extracting ecj_dex.jar from assets...");
+                InputStream is = getAssets().open("ecj_dex.jar");
+                FileOutputStream fos = new FileOutputStream(ecjDexJar);
                 byte[] buffer = new byte[8192];
                 int len;
                 while ((len = is.read(buffer)) > 0) {
@@ -175,9 +175,9 @@ public class MainActivity extends Activity {
                 }
                 fos.close();
                 is.close();
-                Log.d(TAG, "ecj.jar extracted to: " + ecjJar.getAbsolutePath());
+                Log.d(TAG, "ecj_dex.jar extracted to: " + ecjDexJar.getAbsolutePath());
             } catch (Exception e) {
-                Log.e(TAG, "Failed to extract ecj.jar", e);
+                Log.e(TAG, "Failed to extract ecj_dex.jar", e);
             }
         }
 
@@ -274,11 +274,19 @@ public class MainActivity extends Activity {
 
         private String compileJavaFiles(List<File> javaFiles, File outputDir) {
             try {
-                Log.d(TAG, "Loading ecj.jar from: " + ecjJar.getAbsolutePath());
+                Log.d(TAG, "Loading ecj_dex.jar from: " + ecjDexJar.getAbsolutePath());
 
-                // Load ecj.jar
-                URLClassLoader classLoader = new URLClassLoader(
-                    new URL[] { ecjJar.toURI().toURL() },
+                // Create optimized dex output directory
+                File dexOutputDir = new File(getCodeCacheDir(), "ecj_dex");
+                if (!dexOutputDir.exists()) {
+                    dexOutputDir.mkdirs();
+                }
+
+                // Load ecj_dex.jar using DexClassLoader (DEX format for Android)
+                dalvik.system.DexClassLoader classLoader = new dalvik.system.DexClassLoader(
+                    ecjDexJar.getAbsolutePath(),
+                    dexOutputDir.getAbsolutePath(),
+                    null,
                     getClass().getClassLoader()
                 );
 
