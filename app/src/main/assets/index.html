@@ -151,6 +151,17 @@ var consoleContent = document.getElementById("consoleContent");
 var isDirty = false;
 var currentFileName = "untitled.js";
 
+// Debug: Check if elements were found
+if (!currentFile) console.error("currentFile element not found!");
+if (!status) console.error("status element not found!");
+if (!menu) console.error("menu element not found!");
+if (!fileBrowser) console.error("fileBrowser element not found!");
+if (!fileList) console.error("fileList element not found!");
+if (!saveDialog) console.error("saveDialog element not found!");
+if (!saveAsInput) console.error("saveAsInput element not found!");
+if (!consolePanel) console.error("consolePanel element not found!");
+if (!consoleContent) console.error("consoleContent element not found!");
+
 // Console intercept
 var addLog = function(msg, type) {
   var div = document.createElement("div");
@@ -191,12 +202,20 @@ window.onerror = function(msg, url, line, col, error) {
 };
 
 var setStatus = function(msg, color) {
+  if (!status) {
+    console.error("status element not found!");
+    return;
+  }
   status.textContent = msg;
   status.style.color = color || "#666";
 };
 
 var setCurrentFile = function(name) {
   currentFileName = name;
+  if (!currentFile) {
+    console.error("currentFile element not found!");
+    return;
+  }
   currentFile.textContent = name + (isDirty ? " *" : "");
 };
 
