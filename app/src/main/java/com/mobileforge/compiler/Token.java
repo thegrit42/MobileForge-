@@ -5,7 +5,7 @@ public class Token {
         // Actions
         BUILD, CREATE, PLACE, ADD, MAKE, CHANGE, SET, UPDATE, REMOVE,
         WHEN, IF, ELSE, REPEAT, WHILE, FOR, EACH, IN, FROM, TO,
-        IMPORT, USE, CONNECT, LOAD, TRY, ON, END,
+        IMPORT, USE, CONNECT, LOAD, TRY, END,
         CALL, WITH, RETURN, GO, BACK,
 
         // Objects
