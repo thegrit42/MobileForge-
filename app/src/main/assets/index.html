@@ -306,6 +306,10 @@ document.getElementById("saveAsCancel").onclick = function(e) {
 function saveFile(name) {
   if (typeof FileAPI !== "undefined") {
     try {
+      // Auto-append .java if not present
+      if (!name.endsWith(".java")) {
+        name = name + ".java";
+      }
       setStatus("Saving...", "#f90");
       var content = editor.getValue();
       var success = FileAPI.writeFile(name, content);
