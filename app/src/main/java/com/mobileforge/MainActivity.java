@@ -312,9 +312,9 @@ public class MainActivity extends Activity {
                     getClass().getClassLoader()
                 );
 
-                // Create URL classloader for resources from original JAR
-                java.net.URLClassLoader resourceLoader = new java.net.URLClassLoader(
-                    new java.net.URL[] { ecjResourceJar.toURI().toURL() },
+                // Create custom resource loader that can read from JAR files
+                JarResourceClassLoader resourceLoader = new JarResourceClassLoader(
+                    ecjResourceJar,
                     dexLoader
                 );
 
