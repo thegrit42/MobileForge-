@@ -330,10 +330,10 @@ public class MainActivity extends Activity {
                 // Load CompilationProgress interface for method signature
                 Class<?> progressClass = classLoader.loadClass("org.eclipse.jdt.core.compiler.CompilationProgress");
 
-                // Invoke ecj Main.compile()
+                // Invoke ecj Main.compile() - it's a static method, no instance needed
                 Method compileMethod = mainClass.getMethod("compile", String[].class, PrintWriter.class, PrintWriter.class, progressClass);
                 Object result = compileMethod.invoke(
-                    mainClass.newInstance(),
+                    null,  // null for static method
                     (Object) args.toArray(new String[0]),
                     outWriter,
                     errWriter,
