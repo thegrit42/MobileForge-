@@ -16,11 +16,13 @@ public class JarResourceClassLoader extends ClassLoader {
     private static final String TAG = "JarResourceClassLoader";
     private File jarFile;
     private Map<String, byte[]> resourceCache;
+    private JarURLStreamHandler urlHandler;
 
     public JarResourceClassLoader(File jarFile, ClassLoader parent) {
         super(parent);
         this.jarFile = jarFile;
         this.resourceCache = new HashMap<>();
+        this.urlHandler = new JarURLStreamHandler(jarFile);
         Log.d(TAG, "Created classloader for JAR: " + jarFile.getAbsolutePath());
     }
 
@@ -68,9 +70,12 @@ public class JarResourceClassLoader extends ClassLoader {
 
     @Override
     public URL getResource(String name) {
+        Log.d(TAG, "getResource: " + name);
+
         // Try parent first for system resources
         URL parentResource = super.getResource(name);
         if (parentResource != null) {
+            Log.d(TAG, "Found in parent: " + name);
             return parentResource;
         }
 
@@ -80,7 +85,9 @@ public class JarResourceClassLoader extends ClassLoader {
             zip = new ZipFile(jarFile);
             ZipEntry entry = zip.getEntry(name);
             if (entry != null) {
-                return new URL("jar:file:" + jarFile.getAbsolutePath() + "!/" + name);
+                Log.d(TAG, "Creating URL for JAR resource: " + name);
+                // Use custom handler that can actually open the connection
+                return new URL("jar", null, -1, "file:" + jarFile.getAbsolutePath() + "!/" + name, urlHandler);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting resource URL: " + name, e);
@@ -89,6 +96,7 @@ public class JarResourceClassLoader extends ClassLoader {
                 if (zip != null) zip.close();
             } catch (Exception e) {}
         }
+        Log.d(TAG, "Resource not found: " + name);
         return null;
     }
 }
