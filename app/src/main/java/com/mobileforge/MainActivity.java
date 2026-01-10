@@ -160,11 +160,15 @@ public class MainActivity extends Activity {
         }
 
         private void extractEcjIfNeeded() {
-            if (ecjDexJar.exists()) {
-                Log.d(TAG, "ecj_dex.jar already extracted");
-                return;
-            }
             try {
+                if (ecjDexJar.exists()) {
+                    // Ensure it's read-only even if already exists
+                    ecjDexJar.setWritable(false, false);
+                    ecjDexJar.setReadable(true, false);
+                    Log.d(TAG, "ecj_dex.jar already extracted, ensured read-only");
+                    return;
+                }
+
                 Log.d(TAG, "Extracting ecj_dex.jar from assets...");
                 InputStream is = getAssets().open("ecj_dex.jar");
                 FileOutputStream fos = new FileOutputStream(ecjDexJar);
@@ -175,7 +179,12 @@ public class MainActivity extends Activity {
                 }
                 fos.close();
                 is.close();
-                Log.d(TAG, "ecj_dex.jar extracted to: " + ecjDexJar.getAbsolutePath());
+
+                // CRITICAL: Make file read-only to satisfy Android DEX security
+                ecjDexJar.setWritable(false, false);
+                ecjDexJar.setReadable(true, false);
+
+                Log.d(TAG, "ecj_dex.jar extracted and set to read-only: " + ecjDexJar.getAbsolutePath());
             } catch (Exception e) {
                 Log.e(TAG, "Failed to extract ecj_dex.jar", e);
             }
