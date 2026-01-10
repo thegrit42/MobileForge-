@@ -327,8 +327,11 @@ public class MainActivity extends Activity {
                 PrintWriter outWriter = new PrintWriter(out);
                 PrintWriter errWriter = new PrintWriter(err);
 
+                // Load CompilationProgress interface for method signature
+                Class<?> progressClass = classLoader.loadClass("org.eclipse.jdt.core.compiler.CompilationProgress");
+
                 // Invoke ecj Main.compile()
-                Method compileMethod = mainClass.getMethod("compile", String[].class, PrintWriter.class, PrintWriter.class, null);
+                Method compileMethod = mainClass.getMethod("compile", String[].class, PrintWriter.class, PrintWriter.class, progressClass);
                 Object result = compileMethod.invoke(
                     mainClass.newInstance(),
                     (Object) args.toArray(new String[0]),
