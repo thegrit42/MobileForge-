@@ -28,11 +28,13 @@ public class JarResourceClassLoader extends ClassLoader {
 
     @Override
     public InputStream getResourceAsStream(String name) {
-        Log.d(TAG, "getResourceAsStream: " + name);
+        Log.d(TAG, "*** getResourceAsStream: " + name);
+        System.err.println("JarResourceClassLoader.getResourceAsStream: " + name);
 
         // Check cache first
         if (resourceCache.containsKey(name)) {
             Log.d(TAG, "Found in cache: " + name);
+            System.err.println("  -> Found in cache");
             return new ByteArrayInputStream(resourceCache.get(name));
         }
 
@@ -43,6 +45,7 @@ public class JarResourceClassLoader extends ClassLoader {
             ZipEntry entry = zip.getEntry(name);
             if (entry != null) {
                 Log.d(TAG, "Found in JAR: " + name + " (size: " + entry.getSize() + ")");
+                System.err.println("  -> Found in JAR, size: " + entry.getSize());
                 InputStream in = zip.getInputStream(entry);
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 byte[] buffer = new byte[8192];
@@ -54,9 +57,12 @@ public class JarResourceClassLoader extends ClassLoader {
                 byte[] data = baos.toByteArray();
                 resourceCache.put(name, data);
                 return new ByteArrayInputStream(data);
+            } else {
+                System.err.println("  -> NOT FOUND in JAR");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error loading resource: " + name, e);
+            System.err.println("  -> ERROR: " + e.getMessage());
         } finally {
             try {
                 if (zip != null) zip.close();
@@ -65,6 +71,7 @@ public class JarResourceClassLoader extends ClassLoader {
 
         // Fall back to parent
         Log.d(TAG, "Not found in JAR, trying parent: " + name);
+        System.err.println("  -> Trying parent classloader");
         return super.getResourceAsStream(name);
     }
 

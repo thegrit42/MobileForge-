@@ -352,7 +352,10 @@ public class MainActivity extends Activity {
                 // Set context classloader so ecj can find resources
                 Thread currentThread = Thread.currentThread();
                 ClassLoader originalLoader = currentThread.getContextClassLoader();
+                PrintStream originalErr = System.err;
+
                 currentThread.setContextClassLoader(resourceLoader);
+                System.setErr(new PrintStream(err, true));
 
                 try {
                     // Invoke ecj Main.compile() - it's a static method, no instance needed
@@ -382,8 +385,9 @@ public class MainActivity extends Activity {
                         return "COMPILATION FAILED:\n" + outStr + errStr;
                     }
                 } finally {
-                    // Restore original classloader
+                    // Restore original classloader and stderr
                     currentThread.setContextClassLoader(originalLoader);
+                    System.setErr(originalErr);
                 }
 
             } catch (Exception e) {
