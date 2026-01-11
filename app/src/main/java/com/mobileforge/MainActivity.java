@@ -19,6 +19,8 @@ import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -146,11 +148,13 @@ public class MainActivity extends Activity {
         private File ecjDexJar;
         private File buildDir;
         private File mfnlGenDir;
+        private File resourcesDir;
 
         public BuildAPI() {
             ecjDexJar = new File(getFilesDir(), "ecj_dex.jar");
             buildDir = new File(getExternalFilesDir(null), "build");
             mfnlGenDir = new File(buildDir, "mfnl_generated");
+            resourcesDir = new File(getFilesDir(), "jdt_messages");
             if (!buildDir.exists()) {
                 buildDir.mkdirs();
             }
@@ -158,6 +162,7 @@ public class MainActivity extends Activity {
                 mfnlGenDir.mkdirs();
             }
             extractEcjIfNeeded();
+            extractResourcesIfNeeded();
         }
 
         private void extractEcjIfNeeded() {
@@ -184,6 +189,37 @@ public class MainActivity extends Activity {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to extract ecj DEX file", e);
+            }
+        }
+
+        private void extractResourcesIfNeeded() {
+            try {
+                String[] resourcePaths = {
+                    "org/eclipse/jdt/internal/compiler/batch/messages.properties",
+                    "org/eclipse/jdt/internal/compiler/problem/messages.properties",
+                    "org/eclipse/jdt/internal/compiler/messages.properties",
+                    "org/eclipse/jdt/internal/compiler/parser/readableNames.props"
+                };
+
+                if (resourcesDir.exists() && resourcesDir.listFiles().length == 4) {  // Assume 4 files mean extracted
+                    Log.d(TAG, "ECJ resources already extracted");
+                    return;
+                }
+
+                Log.d(TAG, "Extracting ECJ resources from assets...");
+                resourcesDir.mkdirs();
+
+                for (String path : resourcePaths) {
+                    InputStream is = getAssets().open("jdt_resources/" + path);
+                    File resDir = new File(resourcesDir, new File(path).getParent());
+                    resDir.mkdirs();
+                    File propFile = new File(resDir, new File(path).getName());
+                    Files.copy(is, propFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    is.close();
+                }
+                Log.d(TAG, "ECJ resources extracted successfully");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to extract ECJ resources", e);
             }
         }
 
@@ -292,15 +328,19 @@ public class MainActivity extends Activity {
                     dexOutputDir.mkdirs();
                 }
 
-                // Load ECJ classes from DEX
+                // Create URLClassLoader for resources
+                URL resourcesUrl = resourcesDir.toURI().toURL();
+                URLClassLoader resourcesLoader = new URLClassLoader(new URL[]{resourcesUrl}, getClass().getClassLoader());
+
+                // Load ECJ classes from DEX with resources loader as parent
                 dalvik.system.DexClassLoader dexLoader = new dalvik.system.DexClassLoader(
                     ecjDexJar.getAbsolutePath(),
                     dexOutputDir.getAbsolutePath(),
                     null,
-                    getClass().getClassLoader()
+                    resourcesLoader  // Chain resources
                 );
 
-                // Load BatchCompiler class (no resource bundles needed!)
+                // Load BatchCompiler class (resources now accessible via parent)
                 Class<?> batchCompilerClass = dexLoader.loadClass("org.eclipse.jdt.core.compiler.batch.BatchCompiler");
 
                 // Build compiler arguments
@@ -341,7 +381,7 @@ public class MainActivity extends Activity {
                     (Object) args.toArray(new String[0]),
                     outWriter,
                     errWriter,
-                    null  // no progress callback
+                    null
                 );
 
                 outWriter.flush();
