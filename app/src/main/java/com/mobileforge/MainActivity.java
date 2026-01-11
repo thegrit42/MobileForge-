@@ -395,7 +395,10 @@ public class MainActivity extends Activity {
                 Log.e(TAG, "Compilation error", e);
                 StringWriter sw = new StringWriter();
                 e.printStackTrace(new PrintWriter(sw));
-                return "ERROR: " + e.getMessage() + "\n" + sw.toString();
+                String errOutput = err.toString();
+                return "ERROR: " + e.getMessage() + "\n" +
+                       (errOutput.isEmpty() ? "" : "STDERR:\n" + errOutput + "\n") +
+                       sw.toString();
             }
         }
 
