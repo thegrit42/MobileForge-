@@ -395,7 +395,9 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "Compiler errors: " + errStr);
 
                 if (success) {
-                    return "SUCCESS: Compiled " + javaFiles.size() + " file(s)\n" + outStr + errStr;
+                    // Step 6: Convert .class files to .dex
+                    String dexResult = convertClassesToDex(outputDir);
+                    return "SUCCESS: Compiled " + javaFiles.size() + " file(s)\n" + outStr + errStr + "\n\n" + dexResult;
                 } else {
                     return "COMPILATION FAILED:\n" + outStr + errStr;
                 }
@@ -408,6 +410,86 @@ public class MainActivity extends Activity {
                 return "ERROR: " + e.getMessage() + "\n" +
                        (errOutput.isEmpty() ? "" : "STDERR:\n" + errOutput + "\n") +
                        sw.toString();
+            }
+        }
+
+        private String convertClassesToDex(File classesDir) {
+            try {
+                Log.d(TAG, "=== DEX Conversion ===");
+                StringBuilder result = new StringBuilder("=== DEX Conversion ===\n");
+
+                // Find all .class files
+                List<File> classFiles = new ArrayList<>();
+                findClassFiles(classesDir, classFiles);
+
+                if (classFiles.isEmpty()) {
+                    return "ERROR: No .class files found to convert";
+                }
+
+                Log.d(TAG, "Found " + classFiles.size() + " .class files");
+                result.append("Found " + classFiles.size() + " .class file(s)\n\n");
+
+                // Output directory for .dex files
+                File dexDir = new File(buildDir, "dex");
+                if (dexDir.exists()) {
+                    deleteRecursive(dexDir);
+                }
+                dexDir.mkdirs();
+
+                // Convert each .class file to .dex
+                int converted = 0;
+                for (File classFile : classFiles) {
+                    try {
+                        Log.d(TAG, "Converting: " + classFile.getName());
+
+                        // Read .class file bytes
+                        FileInputStream fis = new FileInputStream(classFile);
+                        byte[] classData = new byte[(int) classFile.length()];
+                        fis.read(classData);
+                        fis.close();
+
+                        // Convert to .dex
+                        byte[] dexData = PureCodeDEXGenerator.convertClassToDex(classData);
+
+                        // Write .dex file
+                        String dexFileName = classFile.getName().replace(".class", ".dex");
+                        File dexFile = new File(dexDir, dexFileName);
+                        FileOutputStream fos = new FileOutputStream(dexFile);
+                        fos.write(dexData);
+                        fos.close();
+
+                        converted++;
+                        Log.d(TAG, "Converted: " + classFile.getName() + " -> " + dexFileName);
+
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to convert " + classFile.getName(), e);
+                        result.append("ERROR converting " + classFile.getName() + ": " + e.getMessage() + "\n");
+                        return result.toString();
+                    }
+                }
+
+                result.append("SUCCESS: Converted " + converted + " .class file(s) to .dex\n");
+                result.append("DEX files saved to: " + dexDir.getAbsolutePath());
+
+                return result.toString();
+
+            } catch (Exception e) {
+                Log.e(TAG, "DEX conversion error", e);
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                return "DEX CONVERSION ERROR: " + e.getMessage() + "\n" + sw.toString();
+            }
+        }
+
+        private void findClassFiles(File dir, List<File> classFiles) {
+            File[] files = dir.listFiles();
+            if (files == null) return;
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    findClassFiles(f, classFiles);
+                } else if (f.getName().endsWith(".class")) {
+                    classFiles.add(f);
+                }
             }
         }
 
