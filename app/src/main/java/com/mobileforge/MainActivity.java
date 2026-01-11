@@ -350,6 +350,18 @@ public class MainActivity extends Activity {
                 // Load CompilationProgress interface for method signature
                 Class<?> progressClass = resourceLoader.loadClass("org.eclipse.jdt.core.compiler.CompilationProgress");
 
+                // Test resource loading BEFORE calling ecj
+                Log.d(TAG, "Testing resource loading...");
+                String testResource = "org/eclipse/jdt/internal/compiler/batch/messages.properties";
+                InputStream testStream = resourceLoader.getResourceAsStream(testResource);
+                if (testStream != null) {
+                    Log.d(TAG, "SUCCESS: Found " + testResource);
+                    testStream.close();
+                } else {
+                    Log.e(TAG, "FAILED: Could not find " + testResource);
+                    return "ERROR: Resource test failed - messages.properties not found in ecj.jar";
+                }
+
                 // Set context classloader so ecj can find resources
                 Thread currentThread = Thread.currentThread();
                 ClassLoader originalLoader = currentThread.getContextClassLoader();
