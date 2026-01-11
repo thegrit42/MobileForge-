@@ -1987,7 +1987,7 @@ public class PureCodeDEXGenerator {
                     String baseClassName = ((ConstantUtf8Info) constantPool[classInfo.nameIndex]).value;
                     String arrayTypeName = "[L" + baseClassName + ";";
                     Integer dexTypeId = typeSection.typeIdMap.get(arrayTypeName);
-                    if (dexTypeId == null) { throw new Exception("Missing type ID for object array: "_arrayTypeName); }
+                    if (dexTypeId == null) { throw new Exception("Missing type ID for object array: " + arrayTypeName); }
                     for (short s : makeNewArray(destReg, sizeReg, dexTypeId)) { dalvikInsns.add(s); }
                     i += 3; break;
                 }
