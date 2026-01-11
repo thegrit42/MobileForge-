@@ -296,6 +296,10 @@ public class MainActivity extends Activity {
         }
 
         private String compileJavaFiles(List<File> javaFiles, File outputDir) {
+            // Capture output (declare outside try so catch can access)
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ByteArrayOutputStream err = new ByteArrayOutputStream();
+
             try {
                 Log.d(TAG, "Loading ecj from DEX and resources...");
 
@@ -340,10 +344,6 @@ public class MainActivity extends Activity {
                 args.add("-nowarn");
 
                 Log.d(TAG, "Compiler args: " + args.toString());
-
-                // Capture output
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                ByteArrayOutputStream err = new ByteArrayOutputStream();
                 PrintWriter outWriter = new PrintWriter(out);
                 PrintWriter errWriter = new PrintWriter(err);
 
