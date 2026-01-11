@@ -393,6 +393,16 @@ public class SimpleJavaCompiler {
         }
 
         public byte[] build() throws IOException {
+            // First pass: ensure all constant pool entries are added
+            int thisClassIndex = pool.addClass(className);
+            int superClassIndex = pool.addClass("android/app/Activity");
+
+            // Pre-add method metadata to pool
+            for (MethodBuilder method : methods) {
+                method.ensurePoolEntries(pool);
+            }
+
+            // Now write the class file
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(baos);
 
@@ -403,18 +413,16 @@ public class SimpleJavaCompiler {
             dos.writeShort(0);
             dos.writeShort(52);
 
-            // Constant pool
+            // Constant pool (now complete)
             pool.write(dos);
 
             // Access flags (ACC_PUBLIC | ACC_SUPER)
             dos.writeShort(0x0021);
 
             // This class
-            int thisClassIndex = pool.addClass(className);
             dos.writeShort(thisClassIndex);
 
             // Super class
-            int superClassIndex = pool.addClass("android/app/Activity");
             dos.writeShort(superClassIndex);
 
             // Interfaces
@@ -539,22 +547,29 @@ public class SimpleJavaCompiler {
             code.write(0xb1); // return
         }
 
+        public void ensurePoolEntries(ConstantPool pool) {
+            // Pre-add all strings this method needs
+            pool.addUtf8(name);
+            pool.addUtf8(descriptor);
+            pool.addUtf8("Code");
+        }
+
         public void write(DataOutputStream dos, ConstantPool pool) throws IOException {
             // Access flags
             dos.writeShort(isPublic ? 0x0001 : 0x0000);
 
-            // Name index
+            // Name index (already in pool)
             int nameIndex = pool.addUtf8(name);
             dos.writeShort(nameIndex);
 
-            // Descriptor index
+            // Descriptor index (already in pool)
             int descIndex = pool.addUtf8(descriptor);
             dos.writeShort(descIndex);
 
             // Attributes count (just Code)
             dos.writeShort(1);
 
-            // Code attribute
+            // Code attribute (already in pool)
             int codeAttrIndex = pool.addUtf8("Code");
             dos.writeShort(codeAttrIndex);
 
