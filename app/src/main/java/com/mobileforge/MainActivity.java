@@ -186,9 +186,63 @@ public class MainActivity extends Activity {
                     }
 
                     resultLog.append("\n");
+                } else {
+                    return "ERROR: No .mfnl files found. Please create a .mfnl file first.";
                 }
 
-                resultLog.append("SUCCESS: MFNL compilation complete\n");
+                // Step 3: Find generated .class files
+                List<File> classFiles = new ArrayList<>();
+                findClassFiles(mfnlGenDir, classFiles);
+
+                if (classFiles.isEmpty()) {
+                    return resultLog.toString() + "ERROR: No .class files generated";
+                }
+
+                Log.d(TAG, "Found " + classFiles.size() + " .class files");
+                resultLog.append("=== DEX Conversion ===\n");
+                resultLog.append("Found " + classFiles.size() + " .class file(s)\n\n");
+
+                // Step 4: Prepare output directory for .dex files
+                File dexDir = new File(buildDir, "dex");
+                if (dexDir.exists()) {
+                    deleteRecursive(dexDir);
+                }
+                dexDir.mkdirs();
+
+                // Step 5: Convert each .class to .dex
+                int converted = 0;
+                for (File classFile : classFiles) {
+                    try {
+                        Log.d(TAG, "Converting: " + classFile.getName());
+
+                        // Read .class file
+                        FileInputStream fis = new FileInputStream(classFile);
+                        byte[] classData = new byte[(int) classFile.length()];
+                        fis.read(classData);
+                        fis.close();
+
+                        // Convert to .dex
+                        byte[] dexData = PureCodeDEXGenerator.convertClassToDex(classData);
+
+                        // Write .dex file
+                        String dexFileName = classFile.getName().replace(".class", ".dex");
+                        File dexFile = new File(dexDir, dexFileName);
+                        FileOutputStream fos = new FileOutputStream(dexFile);
+                        fos.write(dexData);
+                        fos.close();
+
+                        converted++;
+                        Log.d(TAG, "Converted: " + classFile.getName() + " -> " + dexFileName);
+
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to convert " + classFile.getName(), e);
+                        resultLog.append("ERROR converting " + classFile.getName() + ": " + e.getMessage() + "\n");
+                        return resultLog.toString();
+                    }
+                }
+
+                resultLog.append("SUCCESS: Converted " + converted + " .class file(s) to .dex\n");
+                resultLog.append("DEX files saved to: " + dexDir.getAbsolutePath());
                 return resultLog.toString();
             } catch (Exception e) {
                 Log.e(TAG, "buildAPK error", e);
@@ -206,6 +260,18 @@ public class MainActivity extends Activity {
                     findMFNLFiles(f, mfnlFiles);
                 } else if (f.getName().endsWith(".mfnl")) {
                     mfnlFiles.add(f);
+                }
+            }
+        }
+
+        private void findClassFiles(File dir, List<File> classFiles) {
+            File[] files = dir.listFiles();
+            if (files == null) return;
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    findClassFiles(f, classFiles);
+                } else if (f.getName().endsWith(".class")) {
+                    classFiles.add(f);
                 }
             }
         }

@@ -13,12 +13,12 @@ public class MFNLCompiler {
     public static class CompileResult {
         public boolean success;
         public String message;
-        public List<File> generatedJavaFiles;
+        public List<File> generatedClassFiles;
 
         public CompileResult(boolean success, String message) {
             this.success = success;
             this.message = message;
-            this.generatedJavaFiles = new ArrayList<>();
+            this.generatedClassFiles = new ArrayList<>();
         }
     }
 
@@ -46,13 +46,18 @@ public class MFNLCompiler {
             ASTNode.Program program = parser.parse();
             Log.d(TAG, "Parsing complete: " + program.statements.size() + " statements");
 
-            // Code generation
-            Log.d(TAG, "Starting code generation...");
-            JavaGenerator generator = new JavaGenerator();
-            String javaCode = generator.generate(program);
-            Log.d(TAG, "Code generation complete: " + javaCode.length() + " chars");
+            // Bytecode generation
+            Log.d(TAG, "Starting bytecode generation...");
+            SimpleJavaCompiler.CompileResult compileResult =
+                SimpleJavaCompiler.compileFromAST(program, "com.mobileforge.generated.MainActivity");
 
-            // Write Java file
+            if (!compileResult.success) {
+                return new CompileResult(false, compileResult.message);
+            }
+
+            Log.d(TAG, "Bytecode generation complete: " + compileResult.classData.length + " bytes");
+
+            // Write .class file
             if (!outputDir.exists()) {
                 outputDir.mkdirs();
             }
@@ -63,13 +68,13 @@ public class MFNLCompiler {
                 packageDir.mkdirs();
             }
 
-            File javaFile = new File(packageDir, "MainActivity.java");
-            writeFile(javaFile, javaCode);
+            File classFile = new File(packageDir, "MainActivity.class");
+            writeFile(classFile, compileResult.classData);
 
-            Log.d(TAG, "Java file written: " + javaFile.getAbsolutePath());
+            Log.d(TAG, ".class file written: " + classFile.getAbsolutePath());
 
-            CompileResult result = new CompileResult(true, "SUCCESS: MFNL compiled to Java\nGenerated: " + javaFile.getName());
-            result.generatedJavaFiles.add(javaFile);
+            CompileResult result = new CompileResult(true, "SUCCESS: MFNL compiled to bytecode\nGenerated: " + classFile.getName());
+            result.generatedClassFiles.add(classFile);
             return result;
 
         } catch (Exception e) {
@@ -87,12 +92,12 @@ public class MFNLCompiler {
             if (!result.success) {
                 return result; // Return first error
             }
-            allGeneratedFiles.addAll(result.generatedJavaFiles);
+            allGeneratedFiles.addAll(result.generatedClassFiles);
             messages.append(result.message).append("\n");
         }
 
         CompileResult finalResult = new CompileResult(true, messages.toString());
-        finalResult.generatedJavaFiles = allGeneratedFiles;
+        finalResult.generatedClassFiles = allGeneratedFiles;
         return finalResult;
     }
 
@@ -112,6 +117,12 @@ public class MFNLCompiler {
     private static void writeFile(File file, String content) throws Exception {
         FileOutputStream fos = new FileOutputStream(file);
         fos.write(content.getBytes("UTF-8"));
+        fos.close();
+    }
+
+    private static void writeFile(File file, byte[] data) throws Exception {
+        FileOutputStream fos = new FileOutputStream(file);
+        fos.write(data);
         fos.close();
     }
 
