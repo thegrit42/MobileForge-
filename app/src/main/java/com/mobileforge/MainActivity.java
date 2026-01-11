@@ -148,13 +148,11 @@ public class MainActivity extends Activity {
         private File ecjDexJar;
         private File buildDir;
         private File mfnlGenDir;
-        private File resourcesDir;
 
         public BuildAPI() {
             ecjDexJar = new File(getFilesDir(), "ecj_dex.jar");
             buildDir = new File(getExternalFilesDir(null), "build");
             mfnlGenDir = new File(buildDir, "mfnl_generated");
-            resourcesDir = new File(getFilesDir(), "jdt_messages");
             if (!buildDir.exists()) {
                 buildDir.mkdirs();
             }
@@ -162,64 +160,30 @@ public class MainActivity extends Activity {
                 mfnlGenDir.mkdirs();
             }
             extractEcjIfNeeded();
-            extractResourcesIfNeeded();
         }
 
         private void extractEcjIfNeeded() {
             try {
-                // Extract DEX version (BatchCompiler doesn't need resource JAR)
+                // ALWAYS re-extract to ensure fresh copy from APK assets
                 if (ecjDexJar.exists()) {
-                    ecjDexJar.setWritable(false, false);
-                    ecjDexJar.setReadable(true, false);
-                    Log.d(TAG, "ecj_dex.jar already extracted, ensured read-only");
-                } else {
-                    Log.d(TAG, "Extracting ecj_dex.jar from assets...");
-                    InputStream is = getAssets().open("ecj_dex.jar");
-                    FileOutputStream fos = new FileOutputStream(ecjDexJar);
-                    byte[] buffer = new byte[8192];
-                    int len;
-                    while ((len = is.read(buffer)) > 0) {
-                        fos.write(buffer, 0, len);
-                    }
-                    fos.close();
-                    is.close();
-                    ecjDexJar.setWritable(false, false);
-                    ecjDexJar.setReadable(true, false);
-                    Log.d(TAG, "ecj_dex.jar extracted and set to read-only");
+                    ecjDexJar.setWritable(true, false);  // Make writable so we can delete
+                    ecjDexJar.delete();
+                    Log.d(TAG, "Deleted old ecj_dex.jar to force fresh extraction");
                 }
+
+                Log.d(TAG, "Extracting ecj_dex.jar from assets...");
+                InputStream is = getAssets().open("ecj_dex.jar");
+                FileOutputStream fos = new FileOutputStream(ecjDexJar);
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = is.read(buffer)) > 0) {
+                    fos.write(buffer, 0, len);
+                }
+                fos.close();
+                is.close();
+                Log.d(TAG, "ecj_dex.jar extracted successfully");
             } catch (Exception e) {
                 Log.e(TAG, "Failed to extract ecj DEX file", e);
-            }
-        }
-
-        private void extractResourcesIfNeeded() {
-            try {
-                String[] resourcePaths = {
-                    "org/eclipse/jdt/internal/compiler/batch/messages.properties",
-                    "org/eclipse/jdt/internal/compiler/problem/messages.properties",
-                    "org/eclipse/jdt/internal/compiler/messages.properties",
-                    "org/eclipse/jdt/internal/compiler/parser/readableNames.props"
-                };
-
-                if (resourcesDir.exists() && resourcesDir.listFiles().length == 4) {  // Assume 4 files mean extracted
-                    Log.d(TAG, "ECJ resources already extracted");
-                    return;
-                }
-
-                Log.d(TAG, "Extracting ECJ resources from assets...");
-                resourcesDir.mkdirs();
-
-                for (String path : resourcePaths) {
-                    InputStream is = getAssets().open("jdt_resources/" + path);
-                    File resDir = new File(resourcesDir, new File(path).getParent());
-                    resDir.mkdirs();
-                    File propFile = new File(resDir, new File(path).getName());
-                    Files.copy(is, propFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    is.close();
-                }
-                Log.d(TAG, "ECJ resources extracted successfully");
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to extract ECJ resources", e);
             }
         }
 
