@@ -1142,6 +1142,18 @@ public class PureCodeDEXGenerator {
                 sortedStrings.add(((ConstantUtf8Info) constantPool[i]).value);
             }
         }
+
+        // Also add shorty strings for all method descriptors
+        for (int i = 1; i < constantPool.length; i++) {
+            if (constantPool[i] == null || (constantPool[i].tag != CONSTANT_Methodref &&
+                                            constantPool[i].tag != CONSTANT_InterfaceMethodref)) continue;
+            ConstantRefInfo methodRef = (ConstantRefInfo) constantPool[i];
+            ConstantNameAndTypeInfo nameAndType = (ConstantNameAndTypeInfo) constantPool[methodRef.nameAndTypeIndex];
+            String descriptorString = ((ConstantUtf8Info) constantPool[nameAndType.descriptorIndex]).value;
+            MethodDescriptor desc = parseMethodDescriptor(descriptorString);
+            String shorty = createShorty(desc);
+            sortedStrings.add(shorty);
+        }
         int stringCount = sortedStrings.size();
         int[] stringDataOffsets = new int[stringCount];
         Map<String, Integer> stringIdMap = new HashMap<>();
