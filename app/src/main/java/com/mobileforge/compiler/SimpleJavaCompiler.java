@@ -250,14 +250,49 @@ public class SimpleJavaCompiler {
 
         public int addMethodRef(String className, String methodName, String descriptor) {
             int classIndex = addClass(className);
+            // Also add all types from the descriptor as Class entries
+            addTypesFromDescriptor(descriptor);
             int nameAndTypeIndex = addNameAndType(methodName, descriptor);
             int index = entries.size();
             entries.add(new MethodRefEntry(classIndex, nameAndTypeIndex));
             return index;
         }
 
+        private void addTypesFromDescriptor(String descriptor) {
+            // Parse method descriptor like "(Landroid/os/Bundle;ILjava/lang/String;)V"
+            // and add all referenced types as Class entries
+            int i = 0;
+            while (i < descriptor.length()) {
+                char c = descriptor.charAt(i);
+                if (c == 'L') {
+                    // Object type - find the semicolon
+                    int end = descriptor.indexOf(';', i);
+                    if (end > i) {
+                        String className = descriptor.substring(i + 1, end);
+                        addClass(className);
+                        i = end + 1;
+                    } else {
+                        i++;
+                    }
+                } else if (c == '[') {
+                    // Array - could be [I, [Ljava/lang/String; etc
+                    i++;
+                } else if (c == '(' || c == ')') {
+                    i++;
+                } else if (c == 'V' || c == 'Z' || c == 'B' || c == 'C' ||
+                           c == 'S' || c == 'I' || c == 'J' || c == 'F' || c == 'D') {
+                    // Primitive type - no Class entry needed for these
+                    i++;
+                } else {
+                    i++;
+                }
+            }
+        }
+
         public int addFieldRef(String className, String fieldName, String descriptor) {
             int classIndex = addClass(className);
+            // Also add the field type as a Class entry if it's an object
+            addTypesFromDescriptor(descriptor);
             int nameAndTypeIndex = addNameAndType(fieldName, descriptor);
             int index = entries.size();
             entries.add(new FieldRefEntry(classIndex, nameAndTypeIndex));
