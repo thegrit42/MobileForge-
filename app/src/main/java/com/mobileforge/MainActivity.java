@@ -177,7 +177,11 @@ public class MainActivity extends Activity {
                 }
                 fos.close();
                 is.close();
-                Log.d(TAG, "ecj_dex.jar extracted successfully");
+
+                // CRITICAL: Set to read-only - Android requires DEX files to be non-writable
+                ecjDexJar.setWritable(false, false);
+                ecjDexJar.setReadable(true, false);
+                Log.d(TAG, "ecj_dex.jar extracted and set to read-only");
             } catch (Exception e) {
                 Log.e(TAG, "Failed to extract ecj DEX file", e);
             }
