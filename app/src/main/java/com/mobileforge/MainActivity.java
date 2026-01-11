@@ -144,13 +144,11 @@ public class MainActivity extends Activity {
 
     public class BuildAPI {
         private File ecjDexJar;
-        private File ecjResourceJar;
         private File buildDir;
         private File mfnlGenDir;
 
         public BuildAPI() {
             ecjDexJar = new File(getFilesDir(), "ecj_dex.jar");
-            ecjResourceJar = new File(getFilesDir(), "ecj.jar");
             buildDir = new File(getExternalFilesDir(null), "build");
             mfnlGenDir = new File(buildDir, "mfnl_generated");
             if (!buildDir.exists()) {
@@ -164,7 +162,7 @@ public class MainActivity extends Activity {
 
         private void extractEcjIfNeeded() {
             try {
-                // Extract DEX version for classes
+                // Extract DEX version (BatchCompiler doesn't need resource JAR)
                 if (ecjDexJar.exists()) {
                     ecjDexJar.setWritable(false, false);
                     ecjDexJar.setReadable(true, false);
@@ -184,23 +182,8 @@ public class MainActivity extends Activity {
                     ecjDexJar.setReadable(true, false);
                     Log.d(TAG, "ecj_dex.jar extracted and set to read-only");
                 }
-
-                // Extract original JAR for resources
-                if (!ecjResourceJar.exists()) {
-                    Log.d(TAG, "Extracting ecj.jar from assets for resources...");
-                    InputStream is = getAssets().open("ecj.jar");
-                    FileOutputStream fos = new FileOutputStream(ecjResourceJar);
-                    byte[] buffer = new byte[8192];
-                    int len;
-                    while ((len = is.read(buffer)) > 0) {
-                        fos.write(buffer, 0, len);
-                    }
-                    fos.close();
-                    is.close();
-                    Log.d(TAG, "ecj.jar extracted for resources");
-                }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to extract ecj files", e);
+                Log.e(TAG, "Failed to extract ecj DEX file", e);
             }
         }
 
@@ -301,7 +284,7 @@ public class MainActivity extends Activity {
             ByteArrayOutputStream err = new ByteArrayOutputStream();
 
             try {
-                Log.d(TAG, "Loading ecj from DEX and resources...");
+                Log.d(TAG, "Loading ECJ BatchCompiler from DEX...");
 
                 // Create optimized dex output directory
                 File dexOutputDir = new File(getCodeCacheDir(), "ecj_dex");
@@ -309,7 +292,7 @@ public class MainActivity extends Activity {
                     dexOutputDir.mkdirs();
                 }
 
-                // Create composite classloader: DEX for classes, JAR for resources
+                // Load ECJ classes from DEX
                 dalvik.system.DexClassLoader dexLoader = new dalvik.system.DexClassLoader(
                     ecjDexJar.getAbsolutePath(),
                     dexOutputDir.getAbsolutePath(),
@@ -317,24 +300,18 @@ public class MainActivity extends Activity {
                     getClass().getClassLoader()
                 );
 
-                // Create custom resource loader that can read from JAR files
-                JarResourceClassLoader resourceLoader = new JarResourceClassLoader(
-                    ecjResourceJar,
-                    dexLoader
-                );
+                // Load BatchCompiler class (no resource bundles needed!)
+                Class<?> batchCompilerClass = dexLoader.loadClass("org.eclipse.jdt.core.compiler.batch.BatchCompiler");
 
-                // Load the Main class from ecj (classes come from DEX, resources from JAR)
-                Class<?> mainClass = resourceLoader.loadClass("org.eclipse.jdt.internal.compiler.batch.Main");
-
-                // Prepare arguments for ecj
+                // Build compiler arguments
                 List<String> args = new ArrayList<>();
 
-                // Add all source files
+                // Source files
                 for (File javaFile : javaFiles) {
                     args.add(javaFile.getAbsolutePath());
                 }
 
-                // Add compiler options
+                // Compiler options
                 args.add("-d");
                 args.add(outputDir.getAbsolutePath());
                 args.add("-source");
@@ -342,65 +319,45 @@ public class MainActivity extends Activity {
                 args.add("-target");
                 args.add("1.8");
                 args.add("-nowarn");
+                args.add("-proc:none");  // Skip annotation processing
 
                 Log.d(TAG, "Compiler args: " + args.toString());
-                PrintWriter outWriter = new PrintWriter(out);
-                PrintWriter errWriter = new PrintWriter(err);
 
-                // Load CompilationProgress interface for method signature
-                Class<?> progressClass = resourceLoader.loadClass("org.eclipse.jdt.core.compiler.CompilationProgress");
+                // Create output writers
+                PrintWriter outWriter = new PrintWriter(out, true);
+                PrintWriter errWriter = new PrintWriter(err, true);
 
-                // Test resource loading BEFORE calling ecj
-                Log.d(TAG, "Testing resource loading...");
-                String testResource = "org/eclipse/jdt/internal/compiler/batch/messages.properties";
-                InputStream testStream = resourceLoader.getResourceAsStream(testResource);
-                if (testStream != null) {
-                    Log.d(TAG, "SUCCESS: Found " + testResource);
-                    testStream.close();
+                // Invoke BatchCompiler.compile() via reflection
+                Method compileMethod = batchCompilerClass.getMethod(
+                    "compile",
+                    String[].class,
+                    PrintWriter.class,
+                    PrintWriter.class,
+                    Class.forName("org.eclipse.jdt.core.compiler.CompilationProgress", false, dexLoader)
+                );
+
+                Boolean success = (Boolean) compileMethod.invoke(
+                    null,  // static method
+                    (Object) args.toArray(new String[0]),
+                    outWriter,
+                    errWriter,
+                    null  // no progress callback
+                );
+
+                outWriter.flush();
+                errWriter.flush();
+
+                String outStr = out.toString();
+                String errStr = err.toString();
+
+                Log.d(TAG, "Compilation result: " + success);
+                Log.d(TAG, "Compiler output: " + outStr);
+                Log.d(TAG, "Compiler errors: " + errStr);
+
+                if (success) {
+                    return "SUCCESS: Compiled " + javaFiles.size() + " file(s)\n" + outStr + errStr;
                 } else {
-                    Log.e(TAG, "FAILED: Could not find " + testResource);
-                    return "ERROR: Resource test failed - messages.properties not found in ecj.jar";
-                }
-
-                // Set context classloader so ecj can find resources
-                Thread currentThread = Thread.currentThread();
-                ClassLoader originalLoader = currentThread.getContextClassLoader();
-                PrintStream originalErr = System.err;
-
-                currentThread.setContextClassLoader(resourceLoader);
-                System.setErr(new PrintStream(err, true));
-
-                try {
-                    // Invoke ecj Main.compile() - it's a static method, no instance needed
-                    Method compileMethod = mainClass.getMethod("compile", String[].class, PrintWriter.class, PrintWriter.class, progressClass);
-                    Object result = compileMethod.invoke(
-                        null,  // null for static method
-                        (Object) args.toArray(new String[0]),
-                        outWriter,
-                        errWriter,
-                        null
-                    );
-
-                    outWriter.flush();
-                    errWriter.flush();
-
-                    String outStr = out.toString();
-                    String errStr = err.toString();
-                    boolean success = (Boolean) result;
-
-                    Log.d(TAG, "Compilation result: " + success);
-                    Log.d(TAG, "Compiler output: " + outStr);
-                    Log.d(TAG, "Compiler errors: " + errStr);
-
-                    if (success) {
-                        return "SUCCESS: Compiled " + javaFiles.size() + " file(s)\n" + outStr + errStr;
-                    } else {
-                        return "COMPILATION FAILED:\n" + outStr + errStr;
-                    }
-                } finally {
-                    // Restore original classloader and stderr
-                    currentThread.setContextClassLoader(originalLoader);
-                    System.setErr(originalErr);
+                    return "COMPILATION FAILED:\n" + outStr + errStr;
                 }
 
             } catch (Exception e) {
