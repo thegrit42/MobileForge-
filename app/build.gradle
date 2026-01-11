@@ -48,16 +48,32 @@ task convertEcjToDex {
             commandLine d8Tool, '--output', outputDir.path, ecjJar.path, '--min-api', '24'
         }
 
-        // Rename classes.dex to ecj_dex.jar
+        // Create ecj_dex.jar with both DEX and resource files
         def dexFile = new File(outputDir, 'classes.dex')
         if (dexFile.exists()) {
-            // Create a JAR with the DEX file
+            // Extract resource files from original ecj.jar
+            def resourcesDir = file('build/ecj_resources')
+            resourcesDir.mkdirs()
+
+            ant.unzip(src: ecjJar.path, dest: resourcesDir.path) {
+                patternset {
+                    exclude(name: '**/*.class')
+                    include(name: '**/*.properties')
+                    include(name: 'META-INF/**')
+                }
+            }
+
+            // Create JAR with both DEX and resources
             ant.zip(destfile: ecjDex.path) {
                 fileset(dir: outputDir.path) {
                     include(name: '*.dex')
                 }
+                fileset(dir: resourcesDir.path) {
+                    include(name: '**/*.properties')
+                    include(name: 'META-INF/**')
+                }
             }
-            println "Created ecj_dex.jar"
+            println "Created ecj_dex.jar with resource bundles"
         }
     }
 }
