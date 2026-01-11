@@ -17,10 +17,6 @@ import java.io.PrintWriter;
 import java.io.PrintStream;
 import java.io.StringWriter;
 import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -292,19 +288,15 @@ public class MainActivity extends Activity {
                     dexOutputDir.mkdirs();
                 }
 
-                // Create URLClassLoader for resources
-                URL resourcesUrl = resourcesDir.toURI().toURL();
-                URLClassLoader resourcesLoader = new URLClassLoader(new URL[]{resourcesUrl}, getClass().getClassLoader());
-
-                // Load ECJ classes from DEX with resources loader as parent
+                // Load ECJ classes from DEX
                 dalvik.system.DexClassLoader dexLoader = new dalvik.system.DexClassLoader(
                     ecjDexJar.getAbsolutePath(),
                     dexOutputDir.getAbsolutePath(),
                     null,
-                    resourcesLoader  // Chain resources
+                    getClass().getClassLoader()
                 );
 
-                // Load BatchCompiler class (resources now accessible via parent)
+                // Load BatchCompiler class (no resource bundles needed!)
                 Class<?> batchCompilerClass = dexLoader.loadClass("org.eclipse.jdt.core.compiler.batch.BatchCompiler");
 
                 // Build compiler arguments
