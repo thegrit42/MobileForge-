@@ -1191,6 +1191,8 @@ public class PureCodeDEXGenerator {
                                          StringSection stringSection,
                                          MapListBuilder mapBuilder) throws Exception {
         Set<String> sortedTypeNames = new TreeSet<>();
+
+        // Add object types from CONSTANT_Class
         for (int i = 1; i < constantPool.length; i++) {
             if (constantPool[i] != null && constantPool[i].tag == CONSTANT_Class) {
                 ConstantClassInfo classInfo = (ConstantClassInfo) constantPool[i];
@@ -1198,6 +1200,32 @@ public class PureCodeDEXGenerator {
                 sortedTypeNames.add(utf8Info.value);
             }
         }
+
+        // Add types from all method/field descriptors (primitives, arrays)
+        for (int i = 1; i < constantPool.length; i++) {
+            if (constantPool[i] == null) continue;
+            if (constantPool[i].tag == CONSTANT_Methodref || 
+                constantPool[i].tag == CONSTANT_InterfaceMethodref ||
+                constantPool[i].tag == CONSTANT_Fieldref) {
+                ConstantRefInfo ref = (ConstantRefInfo) constantPool[i];
+                ConstantNameAndTypeInfo nat = (ConstantNameAndTypeInfo) constantPool[ref.nameAndTypeIndex];
+                String desc = ((ConstantUtf8Info) constantPool[nat.descriptorIndex]).value;
+
+                // Extract types from descriptor
+                if (constantPool[i].tag == CONSTANT_Fieldref) {
+                    // Field: type
+                    sortedTypeNames.add(desc);
+                } else {
+                    // Method: (params)return
+                    MethodDescriptor md = parseMethodDescriptor(desc);
+                    sortedTypeNames.add(md.returnType);
+                    for (String param : md.parameters) {
+                        sortedTypeNames.add(param);
+                    }
+                }
+            }
+        }
+
         int typeCount = sortedTypeNames.size();
         Map<String, Integer> typeIdMap = new HashMap<>();
 
@@ -2183,6 +2211,8 @@ public class PureCodeDEXGenerator {
                         } else {
                             for (short s : makeConst16(destReg, intValue)) { dalvikInsns.add(s); }
                         }
+                    } else {
+                        // TODO: Handle other constant types
                     }
                     i += 2; break;
                 }
@@ -2270,84 +2300,3 @@ public class PureCodeDEXGenerator {
             } else if (fixup.javaOpcode == JAVA_IF_ICMPNE) {
                 newInsns = makeIfCmp(DALVIK_IF_NE, fixup.registerToTest, fixup.registerToTest2, dalvikRelativeOffset);
             } else {
-                continue;
-            }
-            
-            dalvikInsns.set(fixup.dalvikInsnIndex, newInsns[0]);
-            dalvikInsns.set(fixup.dalvikInsnIndex + 1, newInsns[1]);
-        }
-        
-        // --- PASS 3: Fix Up Handler PCs ---
-        for (DalvikHandlerList handlerList : dalvikCode.handlerLists) {
-            if (handlerList.javaCatchAllPc != -1) {
-                handlerList.dalvikCatchAllPc = javaPcToDalvikPcMap.get(handlerList.javaCatchAllPc);
-            }
-            for (DalvikCatchHandler handler : handlerList.handlers) {
-                handler.dalvikHandlerPc = javaPcToDalvikPcMap.get(handler.javaHandlerPc);
-            }
-        }
-
-        // --- 5. Finalize and Write ---
-        dalvikCode.outsSize = dalvikCode.maxOuts;
-        dalvikCode.insnsSize = dalvikInsns.size();
-        dalvikCode.triesSize = dalvikCode.tries.size();
-        dalvikCode.insns = new short[dalvikInsns.size()];
-        for (int j = 0; j < dalvikInsns.size(); j++) {
-            dalvikCode.insns[j] = dalvikInsns.get(j);
-        }
-        
-        return writeCodeItem(writer, dalvikCode, mapBuilder);
-    }
-    
-    // =========================================================================
-    // THE MAIN ORCHESTRATOR
-    // =========================================================================
-
-    /**
-     * The main orchestrator function.
-     * Takes raw .class file bytes and returns raw .dex file bytes.
-     */
-    public static byte[] convertClassToDex(byte[] classData) throws Exception {
-        // 1. PARSE
-        ClassFile classFile = parseClassFile(classData);
-        CpInfo[] constantPool = classFile.constantPool;
-        
-        // 2. INITIALIZE
-        ByteWriter writer = new ByteWriter(classData.length * 2);
-        MapListBuilder mapBuilder = new MapListBuilder();
-
-        // 3. WRITE DEX SECTIONS
-        writeEmptyHeader(writer);
-        mapBuilder.add(TYPE_HEADER_ITEM, 1, 0); 
-        
-        StringSection stringSection = writeStrings(writer, constantPool, mapBuilder);
-        TypeSection typeSection = writeTypes(writer, constantPool, stringSection, mapBuilder);
-        ProtoSection protoSection = writeProtos(writer, constantPool, stringSection, 
-                                               typeSection, mapBuilder);
-        FieldSection fieldSection = writeFields(writer, constantPool, stringSection, 
-                                               typeSection, mapBuilder);
-        MethodSection methodSection = writeMethods(writer, constantPool, stringSection, 
-                                                typeSection, protoSection, mapBuilder);
-        ClassDefSection classDefSection = writeClassDef(writer, classFile, typeSection, 
-                                                    stringSection, mapBuilder);
-        
-        writeClassData(writer, classFile, classDefSection, constantPool, 
-                       stringSection, typeSection, protoSection, 
-                       fieldSection, methodSection, mapBuilder);
-        
-        // 4. WRITE MAP_LIST
-        int mapListOffset = mapBuilder.write(writer);
-        mapBuilder.add(TYPE_MAP_LIST, 1, mapListOffset);
-        writer.buffer.position(mapListOffset);
-        mapBuilder.write(writer); // Re-write map
-
-        // 5. BACK-PATCH HEADER
-        writer.writeU4At(0x34, mapListOffset);
-        
-        // 6. FINALIZE FILE
-        finalizeFile(writer);
-
-        // 7. RETURN FINAL BYTES
-        return writer.toByteArray();
-    }
-}
