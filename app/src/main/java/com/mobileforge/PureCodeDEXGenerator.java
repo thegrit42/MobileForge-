@@ -1280,7 +1280,11 @@ public class PureCodeDEXGenerator {
             } else {
                 List<Integer> paramTypeIds = new ArrayList<>();
                 for (String paramString : desc.parameters) {
-                    paramTypeIds.add(typeSection.typeIdMap.get(paramString));
+                    Integer paramTypeId = typeSection.typeIdMap.get(paramString);
+                    if (paramTypeId == null) {
+                        throw new Exception("Missing type ID for parameter: " + paramString);
+                    }
+                    paramTypeIds.add(paramTypeId);
                 }
                 if (typeListOffsetMap.containsKey(paramTypeIds)) {
                     paramListOffsets[protoId] = typeListOffsetMap.get(paramTypeIds);
@@ -1296,7 +1300,11 @@ public class PureCodeDEXGenerator {
             }
             String shorty = createShorty(desc);
             shortyStringIds[protoId] = stringSection.stringIdMap.get(shorty);
-            returnTypeIds[protoId] = typeSection.typeIdMap.get(desc.returnType);
+            Integer returnTypeId = typeSection.typeIdMap.get(desc.returnType);
+            if (returnTypeId == null) {
+                throw new Exception("Missing type ID for return type: " + desc.returnType);
+            }
+            returnTypeIds[protoId] = returnTypeId;
         }
         mapBuilder.add(TYPE_TYPE_LIST, typeListCount, typeListStartOffset);
 
@@ -1329,9 +1337,10 @@ public class PureCodeDEXGenerator {
             String className = ((ConstantUtf8Info) constantPool[classInfo.nameIndex]).value;
             String fieldName = ((ConstantUtf8Info) constantPool[nameAndType.nameIndex]).value;
             String fieldType = ((ConstantUtf8Info) constantPool[nameAndType.descriptorIndex]).value;
-            int classDexIdx = typeIdMap.get(className);
-            int typeDexIdx = typeIdMap.get(fieldType);
-            int nameDexIdx = stringIdMap.get(fieldName);
+            Integer classDexIdx = typeIdMap.get(className);
+            Integer typeDexIdx = typeIdMap.get(fieldType);
+            Integer nameDexIdx = stringIdMap.get(fieldName);
+            if (classDexIdx == null || typeDexIdx == null || nameDexIdx == null) continue;
             sortedFields.add(new DexFieldId(classDexIdx, typeDexIdx, nameDexIdx));
         }
 
@@ -1372,10 +1381,11 @@ public class PureCodeDEXGenerator {
             String className = ((ConstantUtf8Info) constantPool[classInfo.nameIndex]).value;
             String methodName = ((ConstantUtf8Info) constantPool[nameAndType.nameIndex]).value;
             String methodDesc = ((ConstantUtf8Info) constantPool[nameAndType.descriptorIndex]).value;
-            int classDexIdx = typeIdMap.get(className);
-            int nameDexIdx = stringIdMap.get(methodName);
+            Integer classDexIdx = typeIdMap.get(className);
+            Integer nameDexIdx = stringIdMap.get(methodName);
             MethodDescriptor desc = parseMethodDescriptor(methodDesc);
-            int protoDexIdx = protoIdMap.get(desc);
+            Integer protoDexIdx = protoIdMap.get(desc);
+            if (classDexIdx == null || nameDexIdx == null || protoDexIdx == null) continue;
             sortedMethods.add(new DexMethodId(classDexIdx, protoDexIdx, nameDexIdx));
         }
 
@@ -1406,8 +1416,11 @@ public class PureCodeDEXGenerator {
         String thisClassName = ((ConstantUtf8Info) classFile.constantPool[thisClassInfo.nameIndex]).value;
         ConstantClassInfo superClassInfo = (ConstantClassInfo) classFile.constantPool[classFile.identity.superClassIndex];
         String superClassName = ((ConstantUtf8Info) classFile.constantPool[superClassInfo.nameIndex]).value;
-        int classDexIdx = typeSection.typeIdMap.get(thisClassName);
-        int superclassDexIdx = typeSection.typeIdMap.get(superClassName);
+        Integer classDexIdx = typeSection.typeIdMap.get(thisClassName);
+        Integer superclassDexIdx = typeSection.typeIdMap.get(superClassName);
+        if (classDexIdx == null || superclassDexIdx == null) {
+            throw new Exception("Missing type ID for class or superclass");
+        }
         int accessFlags = classFile.identity.accessFlags;
         int sourceFileDexIdx = ClassDefItem.NO_INDEX;
 
@@ -1447,7 +1460,7 @@ public class PureCodeDEXGenerator {
         List<DexEncodedMethod> virtualMethods = new ArrayList<>();
         
         for (FieldInfo field : classFile.fields) {
-            ResolvedField fieldData = findDexFieldId(field, classFile.constantPool, stringSection, typeSection, fieldSection);
+            ResolvedField fieldData = findDexFieldId(field, constantPool, stringSection, typeSection, fieldSection);
             if (fieldData == null) continue; 
             DexEncodedField encodedField = new DexEncodedField(fieldData.fieldId, field.accessFlags);
             if ((field.accessFlags & 0x0008) != 0) { staticFields.add(encodedField); } 
@@ -1455,7 +1468,7 @@ public class PureCodeDEXGenerator {
         }
         
         for (MethodInfo method : classFile.methods) {
-            int methodDexId = findDexMethodId(method, classFile.constantPool, 
+            int methodDexId = findDexMethodId(method, constantPool, 
                                               stringSection, typeSection, methodSection);
             if (methodDexId == -1) continue; 
             
@@ -1467,7 +1480,7 @@ public class PureCodeDEXGenerator {
             DexEncodedMethod encodedMethod = new DexEncodedMethod(methodDexId, method.accessFlags, codeOffset);
             boolean isDirect = (method.accessFlags & 0x0002) != 0 || 
                              (method.accessFlags & 0x0008) != 0 || 
-                             isConstructor(method, classFile.constantPool, stringSection);
+                             isConstructor(method, constantPool, stringSection);
             if (isDirect) { directMethods.add(encodedMethod); } 
             else { virtualMethods.add(encodedMethod); }
         }
@@ -1603,8 +1616,9 @@ public class PureCodeDEXGenerator {
         String fieldName = ((ConstantUtf8Info) pool[field.nameIndex]).value;
         String fieldType = ((ConstantUtf8Info) pool[field.descriptorIndex]).value;
         
-        int nameDexIdx = stringSection.stringIdMap.get(fieldName);
-        int typeDexIdx = typeSection.typeIdMap.get(fieldType);
+        Integer nameDexIdx = stringSection.stringIdMap.get(fieldName);
+        Integer typeDexIdx = typeSection.typeIdMap.get(fieldType);
+        if (nameDexIdx == null || typeDexIdx == null) return null;
 
         for (DexFieldId fieldId : fieldSection.fieldIdMap.keySet()) {
             if (fieldId.nameIdx == nameDexIdx && fieldId.typeIdx == typeDexIdx) {
@@ -1640,7 +1654,8 @@ public class PureCodeDEXGenerator {
                                        TypeSection typeSection, MethodSection methodSection) throws Exception {
         String methodName = ((ConstantUtf8Info) pool[method.nameIndex]).value;
         String methodDescStr = ((ConstantUtf8Info) pool[method.descriptorIndex]).value;
-        int nameDexIdx = stringSection.stringIdMap.get(methodName);
+        Integer nameDexIdx = stringSection.stringIdMap.get(methodName);
+        if (nameDexIdx == null) return -1;
         for (DexMethodId methodId : methodSection.methodIdMap.keySet()) {
             if (methodId.nameIdx == nameDexIdx) {
                 return methodSection.methodIdMap.get(methodId);
@@ -2126,6 +2141,10 @@ public class PureCodeDEXGenerator {
                 case JAVA_GETSTATIC: {
                     int javaFieldIdx = ((javaBytecode[i+1] & 0xFF) << 8) | (javaBytecode[i+2] & 0xFF);
                     ResolvedField field = findDexFieldId(constantPool, javaFieldIdx, stringSection, typeSection, fieldSection);
+                    if (field == null) {
+                        i += 3;
+                        continue;
+                    }
                     int op = isObject(field.fieldType) ? DALVIK_SGET_OBJECT : DALVIK_SGET;
                     for (short s : makeStaticFieldOp(op, stack.push(), field.fieldId)) { dalvikInsns.add(s); }
                     i += 3; break;
@@ -2133,6 +2152,10 @@ public class PureCodeDEXGenerator {
                 case JAVA_PUTSTATIC: {
                     int javaFieldIdx = ((javaBytecode[i+1] & 0xFF) << 8) | (javaBytecode[i+2] & 0xFF);
                     ResolvedField field = findDexFieldId(constantPool, javaFieldIdx, stringSection, typeSection, fieldSection);
+                    if (field == null) {
+                        i += 3;
+                        continue;
+                    }
                     int op = isObject(field.fieldType) ? DALVIK_SPUT_OBJECT : DALVIK_SPUT;
                     for (short s : makeStaticFieldOp(op, stack.pop(), field.fieldId)) { dalvikInsns.add(s); }
                     i += 3; break;
@@ -2180,6 +2203,10 @@ public class PureCodeDEXGenerator {
                 case JAVA_GETFIELD: {
                     int javaFieldIdx = ((javaBytecode[i+1] & 0xFF) << 8) | (javaBytecode[i+2] & 0xFF);
                     ResolvedField field = findDexFieldId(constantPool, javaFieldIdx, stringSection, typeSection, fieldSection);
+                    if (field == null) {
+                        i += 3;
+                        continue;
+                    }
                     int objReg = stack.pop(); int valReg = stack.push();
                     int op = isObject(field.fieldType) ? DALVIK_IGET_OBJECT : DALVIK_IGET;
                     for (short s : makeFieldOp(op, valReg, objReg, field.fieldId)) { dalvikInsns.add(s); }
@@ -2188,6 +2215,10 @@ public class PureCodeDEXGenerator {
                 case JAVA_PUTFIELD: {
                     int javaFieldIdx = ((javaBytecode[i+1] & 0xFF) << 8) | (javaBytecode[i+2] & 0xFF);
                     ResolvedField field = findDexFieldId(constantPool, javaFieldIdx, stringSection, typeSection, fieldSection);
+                    if (field == null) {
+                        i += 3;
+                        continue;
+                    }
                     int valReg = stack.pop(); int objReg = stack.pop();
                     int op = isObject(field.fieldType) ? DALVIK_IPUT_OBJECT : DALVIK_IPUT;
                     for (short s : makeFieldOp(op, valReg, objReg, field.fieldId)) { dalvikInsns.add(s); }
@@ -2271,32 +2302,4 @@ public class PureCodeDEXGenerator {
                 
                 int javaStartPc = javaHandlers.get(0).startPc;
                 int javaEndPc = javaHandlers.get(0).endPc;
-                int dalvikStartPc = javaPcToDalvikPcMap.get(javaStartPc);
-                int dalvikEndPc = javaPcToDalvikPcMap.get(javaEndPc);
-                
-                dalvikCode.tries.add(new DalvikTryItem(
-                    dalvikStartPc, dalvikEndPc - dalvikStartPc, handlerListIndex
-                ));
-            }
-        }
-        
-        // --- PASS 2: Fix Up Branches ---
-        for (BranchFixup fixup : fixups) {
-            Integer dalvikTargetInsn = javaPcToDalvikPcMap.get(fixup.javaTargetOffset);
-            if (dalvikTargetInsn == null) {
-                throw new Exception("Branch fixup failed: Could not find Java offset " + fixup.javaTargetOffset);
-            }
-            int dalvikRelativeOffset = dalvikTargetInsn - fixup.dalvikInsnIndex;
-            
-            short[] newInsns;
-            if (fixup.javaOpcode == JAVA_GOTO) {
-                newInsns = makeGoto16(dalvikRelativeOffset);
-            } else if (fixup.javaOpcode == JAVA_IFEQ) {
-                newInsns = makeIfEqz(fixup.registerToTest, dalvikRelativeOffset);
-            } else if (fixup.javaOpcode == JAVA_IFNE) {
-                newInsns = makeIfNez(fixup.registerToTest, dalvikRelativeOffset);
-            } else if (fixup.javaOpcode == JAVA_IF_ICMPEQ) {
-                newInsns = makeIfCmp(DALVIK_IF_EQ, fixup.registerToTest, fixup.registerToTest2, dalvikRelativeOffset);
-            } else if (fixup.javaOpcode == JAVA_IF_ICMPNE) {
-                newInsns = makeIfCmp(DALVIK_IF_NE, fixup.registerToTest, fixup.registerToTest2, dalvikRelativeOffset);
-            } else {
+                Integer dalvikStartPc = javaPcToDalvikPcMap.get(java
