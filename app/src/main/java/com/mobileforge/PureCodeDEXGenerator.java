@@ -2303,4 +2303,4 @@ public class PureCodeDEXGenerator {
                 int javaStartPc = javaHandlers.get(0).startPc;
                 int javaEndPc = javaHandlers.get(0).endPc;
                 Integer dalvikStartPc = javaPcToDalvikPcMap.get(javaStartPc);
-                Integer dalvikEndPc = javaPcToDalvikPcMap.get(java
+                Integer dalvikEndPc = javaPcToDalvikPcMap.get(javaEndPc);
