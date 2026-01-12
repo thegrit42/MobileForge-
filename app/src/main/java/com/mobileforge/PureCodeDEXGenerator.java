@@ -2304,3 +2304,52 @@ public class PureCodeDEXGenerator {
                 int javaEndPc = javaHandlers.get(0).endPc;
                 Integer dalvikStartPc = javaPcToDalvikPcMap.get(javaStartPc);
                 Integer dalvikEndPc = javaPcToDalvikPcMap.get(javaEndPc);
+
+            dalvikCode.tries.add(new DalvikTryItem(dalvikStartPc, dalvikEndPc - dalvikStartPc, handlerListIndex));
+            }
+
+            for (DalvikHandlerList handlerList : dalvikCode.handlerLists) {
+                for (DalvikCatchHandler handler : handlerList.handlers) {
+                    handler.dalvikAddr = javaPcToDalvikPcMap.get(handler.javaPc);
+                }
+                if (handlerList.javaCatchAllPc != 0) {
+                    handlerList.dalvikCatchAllAddr = javaPcToDalvikPcMap.get(handlerList.javaCatchAllPc);
+                }
+            }
+        }
+
+        for (BranchFixup fixup : fixups) {
+            Integer dalvikTargetPc = javaPcToDalvikPcMap.get(fixup.javaTargetOffset);
+            int offset = dalvikTargetPc - fixup.dalvikInsnIndex;
+            short[] newBranch = null;
+            switch (fixup.javaOpcode) {
+                case JAVA_GOTO:
+                    newBranch = makeGoto16(offset);
+                    break;
+                case JAVA_IFEQ:
+                    newBranch = makeIfEqz(fixup.reg1, offset);
+                    break;
+                case JAVA_IFNE:
+                    newBranch = makeIfNez(fixup.reg1, offset);
+                    break;
+                case JAVA_IF_ICMPEQ:
+                    newBranch = makeIfCmp(DALVIK_IF_EQ, fixup.reg1, fixup.reg2, offset);
+                    break;
+                case JAVA_IF_ICMPNE:
+                    newBranch = makeIfCmp(DALVIK_IF_NE, fixup.reg1, fixup.reg2, offset);
+                    break;
+            }
+            if (newBranch != null) {
+                for (int k = 0; k < newBranch.length; k++) {
+                    dalvikInsns.set(fixup.dalvikInsnIndex + k, newBranch[k]);
+                }
+            }
+        }
+
+        dalvikCode.insns = new short[dalvikInsns.size()];
+        for (int j = 0; j < dalvikInsns.size(); j++) {
+            dalvikCode.insns[j] = dalvikInsns.get(j);
+        }
+
+        return dalvikCode;
+    }
