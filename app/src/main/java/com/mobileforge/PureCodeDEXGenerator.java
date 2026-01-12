@@ -1174,16 +1174,28 @@ public class PureCodeDEXGenerator {
             }
         }
 
-        // Also add shorty strings for all method descriptors
+        // Add shorty strings and type descriptors from method/field descriptors
         for (int i = 1; i < constantPool.length; i++) {
-            if (constantPool[i] == null || (constantPool[i].tag != CONSTANT_Methodref &&
-                                            constantPool[i].tag != CONSTANT_InterfaceMethodref)) continue;
-            ConstantRefInfo methodRef = (ConstantRefInfo) constantPool[i];
-            ConstantNameAndTypeInfo nameAndType = (ConstantNameAndTypeInfo) constantPool[methodRef.nameAndTypeIndex];
-            String descriptorString = ((ConstantUtf8Info) constantPool[nameAndType.descriptorIndex]).value;
-            MethodDescriptor desc = parseMethodDescriptor(descriptorString);
-            String shorty = createShorty(desc);
-            sortedStrings.add(shorty);
+            if (constantPool[i] == null) continue;
+            if (constantPool[i].tag == CONSTANT_Methodref ||
+                constantPool[i].tag == CONSTANT_InterfaceMethodref ||
+                constantPool[i].tag == CONSTANT_Fieldref) {
+                ConstantRefInfo ref = (ConstantRefInfo) constantPool[i];
+                ConstantNameAndTypeInfo nameAndType = (ConstantNameAndTypeInfo) constantPool[ref.nameAndTypeIndex];
+                String descriptorString = ((ConstantUtf8Info) constantPool[nameAndType.descriptorIndex]).value;
+
+                if (constantPool[i].tag == CONSTANT_Fieldref) {
+                    sortedStrings.add(descriptorString);
+                } else {
+                    MethodDescriptor desc = parseMethodDescriptor(descriptorString);
+                    String shorty = createShorty(desc);
+                    sortedStrings.add(shorty);
+                    sortedStrings.add(desc.returnType);
+                    for (String param : desc.parameters) {
+                        sortedStrings.add(param);
+                    }
+                }
+            }
         }
         int stringCount = sortedStrings.size();
         int[] stringDataOffsets = new int[stringCount];
