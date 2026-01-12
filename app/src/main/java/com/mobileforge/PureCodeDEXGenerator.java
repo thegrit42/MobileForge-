@@ -2351,9 +2351,11 @@ public class PureCodeDEXGenerator {
             dalvikCode.insns[j] = dalvikInsns.get(j);
         }
 
-        // TODO: Write dalvikCode to writer and return the actual offset
-        // For now, returning 0 to fix compilation
-        return 0;
+        dalvikCode.insnsSize = dalvikCode.insns.length;
+        dalvikCode.outsSize = stack.stackPointer;
+        dalvikCode.triesSize = dalvikCode.tries.size();
+
+        return writeCodeItem(writer, dalvikCode, mapBuilder);
     }
 }
 
