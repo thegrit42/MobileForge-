@@ -21,6 +21,37 @@ import java.util.TreeSet;
  */
 public class PureCodeDEXGenerator {
 
+    /**
+     * Main entry point: converts a .class file byte array to a .dex file byte array.
+     */
+    public static byte[] convertClassToDex(byte[] classData) throws Exception {
+        ClassFile classFile = parseClassFile(classData);
+        ByteWriter writer = new ByteWriter(65536);
+        MapListBuilder mapBuilder = new MapListBuilder();
+
+        writeEmptyHeader(writer);
+
+        StringSection stringSection = writeStrings(writer, classFile.constantPool, mapBuilder);
+        TypeSection typeSection = writeTypes(writer, classFile.constantPool, stringSection, mapBuilder);
+        ProtoSection protoSection = writeProtos(writer, classFile.constantPool, stringSection, typeSection, mapBuilder);
+        FieldSection fieldSection = writeFields(writer, classFile.constantPool, stringSection, typeSection, mapBuilder);
+        MethodSection methodSection = writeMethods(writer, classFile.constantPool, stringSection, typeSection, protoSection, mapBuilder);
+        ClassDefSection classDefSection = writeClassDef(writer, classFile, typeSection, stringSection, mapBuilder);
+
+        writeClassData(writer, classFile, classDefSection, classFile.constantPool,
+                      stringSection, typeSection, protoSection, fieldSection, methodSection, mapBuilder);
+
+        int mapListOffset = mapBuilder.write(writer);
+        writer.writeU4At(0x34, mapListOffset);
+
+        finalizeFile(writer);
+
+        byte[] result = new byte[writer.getPosition()];
+        writer.buffer.position(0);
+        writer.buffer.get(result);
+        return result;
+    }
+
     // =========================================================================
     // PART 1-9: .CLASS FILE PARSER
     // =========================================================================
